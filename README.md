@@ -1,65 +1,85 @@
-# NetSpeedGauge: Internet Speed Monitor for Windows Taskbar
+<h1 align="center">NetSpeedGauge: Internet Speed Monitor for Windows Taskbar</h1>
 
-Shows your internet upload and download speed on the Windows taskbar, and how much data you used today, this week, this month and this year.
+<p align="center">
+  <img src="docs/images/banner.png" alt="NetSpeedGauge shows internet upload and download speed on the Windows taskbar, using under 4 MB of RAM" width="860">
+</p>
 
-Uses under 4 MB of RAM. Never connects to the internet. Free and open source.
+<p align="center">
+  Your internet upload and download speed on the Windows taskbar, and how much data you used today, this week, this month and this year.
+</p>
 
-**[Download for Windows](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest)**
+<p align="center">
+  <a href="https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest"><img src="https://img.shields.io/badge/Download_for_Windows-2563EB?style=for-the-badge" alt="Download for Windows"></a>
+</p>
 
-![Upload and download speed on the Windows taskbar](docs/images/taskbar.png)
+<p align="center">
+  <img src="https://img.shields.io/github/v/release/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor?label=version" alt="Latest version">
+  <img src="https://img.shields.io/github/downloads/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/total?label=downloads" alt="Total downloads">
+  <img src="https://img.shields.io/badge/Windows-10_%7C_11-2563EB" alt="Windows 10 and 11">
+  <img src="https://img.shields.io/badge/licence-GPL--3.0-16A34A" alt="GPL-3.0 licence">
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" width="170"><h3>Under 4 MB</h3>RAM on the taskbar</td>
+    <td align="center" width="170"><h3>0.013%</h3>CPU</td>
+    <td align="center" width="170"><h3>404 KB</h3>one file, no install</td>
+    <td align="center" width="170"><h3>0</h3>internet connections</td>
+  </tr>
+</table>
+
+## Why I built it
+
+I tried the taskbar speed monitors out there. One missed most of my downloads because it followed a single adapter. Another showed the right speed but used about 79 MB of RAM. Some had no usage history at all.
+
+So this one counts every adapter, keeps 2 years of history, and stays out of the way.
 
 ## Screenshots
 
-![Data usage by day, week, month and year](docs/images/usage.png)
-
-![Hover card with today's and this month's usage](docs/images/hover-card.png)
-
-![Appearance settings](docs/images/settings-appearance.png)
-
-![Details page with the privacy promise](docs/images/settings-details.png)
-
-The usage screenshot uses sample data.
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/usage.png" alt="Internet data usage by day, week, month and year on Windows"><br><sub>Usage by day, week, month and year (sample data)</sub></td>
+    <td width="50%" align="center"><img src="docs/images/settings-appearance.png" alt="Settings for arrows, colours, font and theme"><br><sub>Make it look the way you want</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/settings-details.png" alt="Privacy page saying your data stays on your PC"><br><sub>Your data stays with you</sub></td>
+    <td width="50%" align="center"><img src="docs/images/taskbar.png" alt="Upload and download speed on the Windows taskbar"><br><sub>On the taskbar, beside the tray</sub><br><br><img src="docs/images/hover-card.png" alt="Hover card with today's and this month's data usage"><br><sub>Hover for today and this month</sub></td>
+  </tr>
+</table>
 
 ## What it does
 
-**Speed**
-- Live upload and download speed on the taskbar
-- Counts Wi-Fi, LAN, Wi-Fi Direct and Bluetooth together, or only the adapters you choose
-- VPN traffic counts once, on the real adapter
-- Mbps, MBps, Mibps or MiBps, with your choice of decimals
-
-**Data usage**
-- Day, week, month and year charts, kept for up to 2 years
-- Split by adapter
-- Hover over the numbers to see today and this month
-- Downloads still count if the app was closed, as long as Windows did not restart
-
-**Look**
-- Light, dark or same as Windows
-- Choose the arrows, thickness, colours, font, size and background
-- Colours can change with speed
-
-## Size on my PC
-
-Measured on Windows 11 over 20 minutes of normal use. Yours may differ.
-
-| What | Measured |
-|---|---|
-| Download | 404 KB, one file, nothing to install |
-| RAM on the taskbar | 1.5 to 3.8 MB |
-| RAM with Usage open | 6.4 MB |
-| RAM with Settings open | 4.9 MB |
-| CPU | 0.013% of the whole processor |
-
-Usage and Settings only exist while open, and give their memory back when you close them.
-
-## Privacy
-
-- Nothing leaves your PC. There is no account, tracking, ads or server.
-- The program has no network library in it. It only reads your adapters' byte counts from Windows.
-- Your usage and settings stay in `%APPDATA%\NetSpeedGauge`. They are not encrypted, they are just never sent anywhere.
-
-The code is here, so you can check all of this.
+<table>
+  <tr>
+    <td valign="top" width="33%">
+      <b>Speed</b>
+      <ul>
+        <li>Live upload and download speed</li>
+        <li>Wi-Fi, LAN, Wi-Fi Direct and Bluetooth together, or only the adapters you pick</li>
+        <li>VPN traffic counts once</li>
+        <li>Mbps, MBps, Mibps or MiBps</li>
+      </ul>
+    </td>
+    <td valign="top" width="33%">
+      <b>Data usage</b>
+      <ul>
+        <li>Day, week, month and year charts</li>
+        <li>Kept for up to 2 years</li>
+        <li>Split by adapter</li>
+        <li>Still counts while the app is closed, as long as Windows did not restart</li>
+      </ul>
+    </td>
+    <td valign="top" width="33%">
+      <b>Look</b>
+      <ul>
+        <li>Light, dark or same as Windows</li>
+        <li>Arrows, thickness, colours, font, size and background</li>
+        <li>Colours can change with speed</li>
+        <li>Your colours follow into Usage and the hover card</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
 ## Install
 
@@ -77,22 +97,57 @@ Tested on Windows 11. It should also work on Windows 10 and Windows on ARM, but 
 
 It shows on the main taskbar only.
 
+<table>
+  <tr>
+    <td valign="top" width="50%">
+      <h2>Privacy</h2>
+      <ul>
+        <li>Nothing leaves your PC. No account, tracking, ads or server.</li>
+        <li>No network library in the program. It only reads your adapters' byte counts from Windows.</li>
+        <li>Usage and settings stay in <code>%APPDATA%\NetSpeedGauge</code>. They are not encrypted, they are just never sent anywhere.</li>
+        <li>The code is all here, so you can check it yourself or ask an AI to.</li>
+      </ul>
+    </td>
+    <td valign="top" width="50%">
+      <h2>Size on my PC</h2>
+      <table>
+        <tr><td>RAM on the taskbar</td><td>1.5 to 3.8 MB</td></tr>
+        <tr><td>RAM with Usage open</td><td>6.4 MB</td></tr>
+        <tr><td>RAM with Settings open</td><td>4.9 MB</td></tr>
+        <tr><td>CPU</td><td>0.013% of the processor</td></tr>
+        <tr><td>Download</td><td>404 KB</td></tr>
+      </table>
+      <sub>Windows 11, 20 minutes of normal use. Yours may differ. Usage and Settings give their memory back when closed.</sub>
+    </td>
+  </tr>
+</table>
+
 ## Common questions
 
-**How do I see internet speed on the Windows 11 taskbar?**
-Run NetSpeedGauge. The speed appears beside the system tray.
+<details>
+<summary><b>How do I see internet speed on the Windows 11 taskbar?</b></summary>
+<br>Run NetSpeedGauge. The speed appears beside the system tray.
+</details>
 
-**How do I check how much data I used this month on Windows?**
-Click the numbers or right-click them and choose **Usage**, then pick **Month**.
+<details>
+<summary><b>How do I check how much data I used this month on Windows?</b></summary>
+<br>Click the numbers, or right-click them and choose <b>Usage</b>, then pick <b>Month</b>.
+</details>
 
-**Does it show Mbps or MBps?**
-Either. Change it under **Settings**, **Units**.
+<details>
+<summary><b>Does it show Mbps or MBps?</b></summary>
+<br>Either. Change it under <b>Settings</b>, <b>Units</b>.
+</details>
 
-**Does it slow down my PC or use my data?**
-No data, because it never connects to the internet. For CPU and RAM, see the table above.
+<details>
+<summary><b>Does it slow down my PC or use my data?</b></summary>
+<br>No data, because it never connects to the internet. For CPU and RAM, see the numbers above.
+</details>
 
-**Why are other adapters missing from the Usage list?**
-An adapter appears there after data has moved through it. Settings lists all of them.
+<details>
+<summary><b>Why are other adapters missing from the Usage list?</b></summary>
+<br>An adapter appears there after data has moved through it. Settings lists all of them.
+</details>
 
 ## Build it yourself
 
@@ -109,4 +164,4 @@ The program ends up in `target\release\NetSpeedGauge.exe`.
 
 [GPL-3.0](LICENSE)
 
-Made in India by Ashutosh Anand.
+<p align="center">Made in India by Ashutosh Anand.</p>
