@@ -1,0 +1,3 @@
+# Link the C runtime into the exe so users never need a separate redistributable.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

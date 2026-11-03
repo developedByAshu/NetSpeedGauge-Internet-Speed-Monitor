@@ -1,0 +1,25 @@
+1 ICON "netspeedgauge.ico"
+
+1 VERSIONINFO
+FILEVERSION VERSION_MAJOR,VERSION_MINOR,VERSION_PATCH,0
+PRODUCTVERSION VERSION_MAJOR,VERSION_MINOR,VERSION_PATCH,0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Ashutosh Anand\0"
+            VALUE "FileDescription", "NetSpeedGauge Internet Speed Monitor\0"
+            VALUE "InternalName", "NetSpeedGauge\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Ashutosh Anand. GPL-3.0.\0"
+            VALUE "OriginalFilename", "NetSpeedGauge.exe\0"
+            VALUE "ProductName", "NetSpeedGauge\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
