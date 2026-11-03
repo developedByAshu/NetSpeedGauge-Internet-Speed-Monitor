@@ -14,7 +14,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/v/release/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor?label=version" alt="Latest version">
-  <img src="https://img.shields.io/github/downloads/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/total?label=downloads" alt="Total downloads">
   <img src="https://img.shields.io/badge/Windows-10_%7C_11-2563EB" alt="Windows 10 and 11">
   <img src="https://img.shields.io/badge/licence-GPL--3.0-16A34A" alt="GPL-3.0 licence">
 </p>
