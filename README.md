@@ -1,11 +1,11 @@
-<h1 align="center">NetSpeedGauge: Internet Speed Monitor for Windows Taskbar</h1>
+<h1 align="center">NetSpeedGauge (Internet Speed Meter)</h1>
 
 <p align="center">
   <img src="docs/images/banner.png" alt="NetSpeedGauge shows internet upload and download speed on the Windows taskbar, using under 4 MB of RAM" width="860">
 </p>
 
 <p align="center">
-  Your internet upload and download speed on the Windows taskbar, and how much data you used today, this week, this month and this year.
+  A tiny internet speed monitor for the Windows taskbar. See your upload and download speed, and how much data you used today, this week, this month and this year.
 </p>
 
 <p align="center">
@@ -65,7 +65,8 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
         <li>Day, week, month and year charts</li>
         <li>Kept for up to 2 years</li>
         <li>Split by adapter</li>
-        <li>Still counts while the app is closed, as long as Windows did not restart</li>
+        <li>Keeps counting across Windows restarts</li>
+        <li>Closed the app? It catches up when you reopen it, if Windows has not restarted since</li>
       </ul>
     </td>
     <td valign="top" width="33%">
@@ -162,5 +163,3 @@ The program ends up in `target\release\NetSpeedGauge.exe`.
 ## Licence
 
 [GPL-3.0](LICENSE)
-
-<p align="center">Made in India by Ashutosh Anand.</p>
