@@ -9,7 +9,9 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "docs" / "images"
 WINDOW_SHOTS = ["usage.png", "settings-appearance.png", "settings-details.png", "hover-card.png"]
-TITLE_BAR_SHOTS = ["usage.png", "settings-appearance.png", "settings-details.png"]
+TILE_SIZE = (680, 670)
+TILE_GAP = 48
+TITLE_BAR_SHOTS =["usage.png", "settings-appearance.png", "settings-details.png"]
 TITLE_ICON_POSITION = (8, 7)
 TITLE_ICON_SIZE = 16
 FONT_REGULAR = "C:/Windows/Fonts/segoeui.ttf"
@@ -52,6 +54,31 @@ def put_app_icon(image):
     ImageDraw.Draw(image).rectangle((left, top, left + TITLE_ICON_SIZE, top + TITLE_ICON_SIZE), fill=title_color)
     icon = Image.open(ROOT / "assets" / "netspeedgauge.png").convert("RGBA").resize((TITLE_ICON_SIZE, TITLE_ICON_SIZE), Image.LANCZOS)
     image.paste(icon, TITLE_ICON_POSITION, icon)
+
+
+def on_tile(*shots):
+    """Stacks shots, centred, on an empty tile the size of the Settings shots, so all four grid cells match."""
+    tile = Image.new("RGBA", TILE_SIZE, (0, 0, 0, 0))
+    top = (TILE_SIZE[1] - sum(shot.height for shot in shots) - TILE_GAP * (len(shots) - 1)) // 2
+    for shot in shots:
+        tile.alpha_composite(shot, ((TILE_SIZE[0] - shot.width) // 2, top))
+        top += shot.height + TILE_GAP
+    return tile
+
+
+def scaled(image, factor):
+    """Returns the image resized by a factor, on transparency."""
+    size = (round(image.width * factor), round(image.height * factor))
+    return image.convert("RGBA").resize(size, Image.LANCZOS)
+
+
+def draw_grid_tiles():
+    """Draws the two grid cells whose shots are not Settings sized: Usage at full tile height, and the taskbar with the card."""
+    usage = Image.open(IMAGES / "usage.png")
+    on_tile(scaled(usage, TILE_SIZE[1] / usage.height)).save(IMAGES / "tile-usage.png", optimize=True)
+    taskbar = Image.open(IMAGES / "taskbar.png").convert("RGB")
+    card = Image.open(IMAGES / "hover-card.png")
+    on_tile(scaled(rounded(taskbar, 4), 2), scaled(card, 2)).save(IMAGES / "tile-taskbar.png", optimize=True)
 
 
 def draw_banner():
@@ -97,3 +124,4 @@ if __name__ == "__main__":
     for name in WINDOW_SHOTS:
         tidy_window_shot(IMAGES / name)
     draw_banner()
+    draw_grid_tiles()

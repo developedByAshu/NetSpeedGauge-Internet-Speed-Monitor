@@ -37,12 +37,12 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
 
 <table>
   <tr>
-    <td width="50%" align="center"><img src="docs/images/usage.png" alt="Internet data usage by day, week, month and year on Windows"><br><sub>Usage by day, week, month and year (sample data)</sub></td>
+    <td width="50%" align="center"><img src="docs/images/tile-usage.png" alt="Internet data usage by day, week, month and year on Windows"><br><sub>Usage by day, week, month and year (sample data)</sub></td>
     <td width="50%" align="center"><img src="docs/images/settings-appearance.png" alt="Settings for theme, font, colours and icons"><br><sub>Make it look the way you want</sub></td>
   </tr>
   <tr>
     <td width="50%" align="center"><img src="docs/images/settings-details.png" alt="Privacy page saying your data stays on your PC"><br><sub>Your data stays with you</sub></td>
-    <td width="50%" align="center"><img src="docs/images/taskbar.png" alt="Upload and download speed on the Windows taskbar"><br><sub>On the taskbar, beside the tray</sub><br><br><img src="docs/images/hover-card.png" alt="Hover card with today's and this month's data usage"><br><sub>Hover for today and this month</sub></td>
+    <td width="50%" align="center"><img src="docs/images/tile-taskbar.png" alt="Upload and download speed on the Windows taskbar, and the hover card with today's and this month's data usage"><br><sub>On the taskbar. Hover for today and this month</sub></td>
   </tr>
 </table>
 
