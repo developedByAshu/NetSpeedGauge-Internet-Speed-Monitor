@@ -9,6 +9,9 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "docs" / "images"
 WINDOW_SHOTS = ["usage.png", "settings-appearance.png", "settings-details.png", "hover-card.png"]
+TITLE_BAR_SHOTS = ["usage.png", "settings-appearance.png", "settings-details.png"]
+TITLE_ICON_POSITION = (8, 7)
+TITLE_ICON_SIZE = 16
 FONT_REGULAR = "C:/Windows/Fonts/segoeui.ttf"
 FONT_STRONG = "C:/Windows/Fonts/seguisb.ttf"
 BANNER_SIZE = (1280, 640)
@@ -36,7 +39,19 @@ def tidy_window_shot(path):
     """Cuts away the black margin a window capture leaves around the window, then rounds the corners."""
     image = Image.open(path).convert("RGB")
     box = ImageChops.difference(image, Image.new("RGB", image.size, (0, 0, 0))).getbbox()
-    rounded(image.crop(box), 10).save(path)
+    image = image.crop(box)
+    if path.name in TITLE_BAR_SHOTS:
+        put_app_icon(image)
+    rounded(image, 10).save(path)
+
+
+def put_app_icon(image):
+    """Replaces the blank title bar icon of the preview tools, which do not carry the app's icon, with the real one."""
+    left, top = TITLE_ICON_POSITION
+    title_color = image.getpixel((left - 4, top))
+    ImageDraw.Draw(image).rectangle((left, top, left + TITLE_ICON_SIZE, top + TITLE_ICON_SIZE), fill=title_color)
+    icon = Image.open(ROOT / "assets" / "netspeedgauge.png").convert("RGBA").resize((TITLE_ICON_SIZE, TITLE_ICON_SIZE), Image.LANCZOS)
+    image.paste(icon, TITLE_ICON_POSITION, icon)
 
 
 def draw_banner():

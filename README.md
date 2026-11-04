@@ -38,7 +38,7 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
 <table>
   <tr>
     <td width="50%" align="center"><img src="docs/images/usage.png" alt="Internet data usage by day, week, month and year on Windows"><br><sub>Usage by day, week, month and year (sample data)</sub></td>
-    <td width="50%" align="center"><img src="docs/images/settings-appearance.png" alt="Settings for arrows, colours, font and theme"><br><sub>Make it look the way you want</sub></td>
+    <td width="50%" align="center"><img src="docs/images/settings-appearance.png" alt="Settings for theme, font, colours and icons"><br><sub>Make it look the way you want</sub></td>
   </tr>
   <tr>
     <td width="50%" align="center"><img src="docs/images/settings-details.png" alt="Privacy page saying your data stays on your PC"><br><sub>Your data stays with you</sub></td>
@@ -73,9 +73,10 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
       <b>Look</b>
       <ul>
         <li>Light, dark or same as Windows</li>
-        <li>Arrows, thickness, colours, font, size and background</li>
+        <li>Icons, thickness, colours, font, size and background</li>
         <li>Colours can change with speed</li>
         <li>Your colours follow into Usage and the hover card</li>
+        <li>Choose what hover and click open</li>
       </ul>
     </td>
   </tr>
@@ -86,6 +87,8 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
 1. Download `NetSpeedGauge-x64.exe` from [Releases](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest). On a Windows on ARM PC, take `NetSpeedGauge-arm64.exe`.
 2. Put it in a folder you will keep, then run it.
 3. To open it at sign in, turn on **Start with Windows** in Settings.
+
+To update, choose **Exit**, then replace the old file with the new one. Your settings and usage stay as they are.
 
 Windows may show a SmartScreen warning because the program is not code signed yet. Choose **More info**, then **Run anyway**. `SHA256SUMS.txt` in each release lets you check the file.
 
@@ -111,13 +114,13 @@ It shows on the main taskbar only.
     <td valign="top" width="50%">
       <h2>Size on my PC</h2>
       <table>
-        <tr><td>RAM on the taskbar</td><td>1.5 to 3.8 MB</td></tr>
-        <tr><td>RAM with Usage open</td><td>6.4 MB</td></tr>
-        <tr><td>RAM with Settings open</td><td>4.9 MB</td></tr>
+        <tr><td>RAM on the taskbar</td><td>1.7 to 2.9 MB</td></tr>
+        <tr><td>RAM with Usage open</td><td>4.3 MB</td></tr>
+        <tr><td>RAM with Settings open</td><td>6.1 MB</td></tr>
         <tr><td>CPU</td><td>0.013% of the processor</td></tr>
         <tr><td>Download</td><td>404 KB</td></tr>
       </table>
-      <sub>Windows 11, 20 minutes of normal use. Yours may differ. Usage and Settings give their memory back when closed.</sub>
+      <sub>Windows 11, 10 minutes of normal use. Yours may differ. Usage and Settings give their memory back when closed.</sub>
     </td>
   </tr>
 </table>
