@@ -9,7 +9,7 @@ use crate::theme::{app_icon, apply_title_bar, current_theme, dark_theme, draw_fo
 use crate::usage_store::{Bucket, Period, UsageStore};
 use std::cell::RefCell;
 use std::rc::Rc;
-use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
     BeginPaint, DeleteObject, EndPaint, GetMonitorInfoW, InvalidateRect, MonitorFromWindow, HFONT,
     MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT,
@@ -21,11 +21,12 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SetFocus, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, VK_ESCAPE, VK_LEFT, VK_RIGHT,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, LoadCursorW, PostMessageW, RegisterClassW, SetCursor,
-    SetForegroundWindow, SetWindowPos, ShowWindow, HTCLIENT, IDC_ARROW, IDC_HAND, SWP_NOACTIVATE,
-    SWP_NOZORDER, SW_SHOW, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND, WM_KEYDOWN, WM_LBUTTONUP,
-    WM_MOUSEMOVE, WM_PAINT, WM_SETCURSOR, WM_SETTINGCHANGE, WNDCLASSW, WS_CAPTION, WS_MINIMIZEBOX,
-    WS_EX_TOPMOST, WS_OVERLAPPED, WS_SYSMENU,
+    CreateWindowExW, DefWindowProcW, GetCursorPos, GetWindowRect, IsIconic, KillTimer, LoadCursorW,
+    PostMessageW, RegisterClassW, SetCursor, SetForegroundWindow, SetTimer, SetWindowPos, ShowWindow,
+    HTCLIENT, IDC_ARROW, IDC_HAND, SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOW, SW_SHOWNOACTIVATE, WM_ACTIVATE,
+    WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_ERASEBKGND, WM_KEYDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT,
+    WM_SETCURSOR, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_MINIMIZEBOX, WS_EX_TOPMOST,
+    WS_OVERLAPPED, WS_SYSMENU,
 };
 
 // The windows-sys crate does not export this message, so it is declared here.
@@ -49,6 +50,22 @@ const PERIODS: [(Period, &str); 4] =
 const ICON_CHEVRON_DOWN: &str = "\u{E70D}";
 const ICON_CHECK: &str = "\u{E73E}";
 const ALL_ADAPTERS: &str = "All adapters";
+const MOUSE_CHECK_TIMER: usize = 1;
+// A guess, not measured: frequent enough to feel immediate, with a little time to cross from the numbers to the window.
+const MOUSE_CHECK_MS: u32 = 150;
+const AWAY_CHECKS_TO_CLOSE: u32 = 2;
+const WA_INACTIVE: u32 = 0;
+
+/// What opened the window, which decides what closes it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenedBy {
+    /// Stays until the user closes it.
+    Menu,
+    /// Stays until the next click, on the numbers or anywhere else.
+    Click,
+    /// Stays only while the mouse is on the numbers or on the window.
+    Hover,
+}
 
 /// The fonts the window uses, released when it closes.
 struct Fonts {
@@ -166,6 +183,8 @@ struct UsageWindow {
     hover_control: Option<Control>,
     is_menu_open: bool,
     is_tracking_mouse: bool,
+    opened_by: OpenedBy,
+    away_checks: u32,
 }
 
 /// Something clickable other than a chart bar.
@@ -182,6 +201,22 @@ thread_local! {
 }
 
 impl UsageWindow {
+    /// Counts how long the mouse has been off both the numbers and the window, and says when that is long enough.
+    fn has_mouse_left(&mut self) -> bool {
+        let mut cursor = POINT { x: 0, y: 0 };
+        // SAFETY: every pointer refers to a local, and both handles live as long as this state.
+        let is_over = unsafe {
+            GetCursorPos(&mut cursor);
+            [self.window, self.anchor].iter().any(|&area| {
+                let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                GetWindowRect(area, &mut rect);
+                cursor.x >= rect.left && cursor.x < rect.right && cursor.y >= rect.top && cursor.y < rect.bottom
+            })
+        };
+        self.away_checks = if is_over { 0 } else { self.away_checks + 1 };
+        self.away_checks >= AWAY_CHECKS_TO_CLOSE
+    }
+
     /// Converts a size at 100% scaling to pixels at the current scaling.
     fn px(&self, value: i32) -> i32 {
         (value as f32 * self.dpi as f32 / BASE_DPI).round() as i32
@@ -607,6 +642,24 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
             }
             0
         }
+        WM_TIMER => {
+            let mut has_left = false;
+            with_window(|state| has_left = state.has_mouse_left());
+            if has_left && IsIconic(window) == 0 {
+                PostMessageW(window, WM_CLOSE, 0, 0);
+            }
+            0
+        }
+        WM_ACTIVATE => {
+            // The high half says the window is being minimized, which must not count as clicking elsewhere.
+            let is_click_elsewhere = (wparam & 0xFFFF) as u32 == WA_INACTIVE && wparam >> 16 == 0;
+            let mut is_click_opened = false;
+            with_window(|state| is_click_opened = state.opened_by == OpenedBy::Click);
+            if is_click_elsewhere && is_click_opened {
+                PostMessageW(window, WM_CLOSE, 0, 0);
+            }
+            DefWindowProcW(window, message, wparam, lparam)
+        }
         WM_SETTINGCHANGE => {
             with_window(|state| {
                 state.theme = current_theme();
@@ -681,15 +734,29 @@ pub fn close() {
     }
 }
 
-/// Opens the usage window just above the taskbar, or brings it forward if it is already open.
-pub fn open(store: Rc<RefCell<UsageStore>>, anchor: HWND, keep_on_top: bool) {
+/// Returns what opened the usage window, or None while it is closed.
+pub fn opened_by() -> Option<OpenedBy> {
+    let mut opened_by = None;
+    with_window(|state| opened_by = Some(state.opened_by));
+    opened_by
+}
+
+/// Opens the usage window just above the taskbar. If it is already open, brings it forward and it now closes the new way.
+pub fn open(store: Rc<RefCell<UsageStore>>, anchor: HWND, keep_on_top: bool, opened_by: OpenedBy) {
     let mut existing = None;
-    with_window(|state| existing = Some(state.window));
+    with_window(|state| {
+        state.opened_by = opened_by;
+        existing = Some(state.window);
+    });
     if let Some(window) = existing {
         // SAFETY: the handle came from the live window state.
-        unsafe { SetForegroundWindow(window) };
+        unsafe {
+            KillTimer(window, MOUSE_CHECK_TIMER);
+            SetForegroundWindow(window);
+        }
         return;
     }
+    let is_hover = opened_by == OpenedBy::Hover;
     let class_name = to_wide(CLASS_NAME);
     let title = to_wide(WINDOW_TITLE);
     let style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
@@ -723,7 +790,8 @@ pub fn open(store: Rc<RefCell<UsageStore>>, anchor: HWND, keep_on_top: bool) {
         let y = monitor.rcWork.bottom - outer_height - scale(SCREEN_MARGIN);
 
         let window = CreateWindowExW(
-            if keep_on_top { WS_EX_TOPMOST } else { 0 },
+            // A hovered window takes no focus, so only this keeps it above the app in front.
+            if keep_on_top || is_hover { WS_EX_TOPMOST } else { 0 },
             class_name.as_ptr(),
             title.as_ptr(),
             style,
@@ -751,11 +819,18 @@ pub fn open(store: Rc<RefCell<UsageStore>>, anchor: HWND, keep_on_top: bool) {
             hover_control: None,
             is_menu_open: false,
             is_tracking_mouse: false,
+            opened_by,
+            away_checks: 0,
         };
         apply_title_bar(state.window, &state.theme);
         OPEN_WINDOW.with(|cell| *cell.borrow_mut() = Some(state));
-        ShowWindow(window, SW_SHOW);
-        SetForegroundWindow(window);
-        SetFocus(window);
+        if is_hover {
+            ShowWindow(window, SW_SHOWNOACTIVATE);
+            SetTimer(window, MOUSE_CHECK_TIMER, MOUSE_CHECK_MS, None);
+        } else {
+            ShowWindow(window, SW_SHOW);
+            SetForegroundWindow(window);
+            SetFocus(window);
+        }
     }
 }

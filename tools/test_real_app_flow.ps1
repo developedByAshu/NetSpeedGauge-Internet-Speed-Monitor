@@ -67,6 +67,11 @@ $settings = Find-Window 'NetSpeedGaugeSettings' 'NetSpeedGauge Settings'
 Check 'Settings opens' ($settings -ne [IntPtr]::Zero)
 Save-Window $settings 'settings-real'
 
+# Start from the default hover and click choices, whatever the user has saved. Their file comes back at the end.
+Click $settings 90 240
+Click $settings 487 225
+Click $settings 589 279
+
 # Icon style: letters, then back to arrows.
 Click $settings 90 120
 Save-Window $settings 'settings-appearance-real'
@@ -187,22 +192,91 @@ Check 'megabytes restored' ((Saved 'unit') -eq '0')
 Check 'decimals stop at 2' ((Saved 'decimals') -eq '2')
 Save-Window $settings 'settings-decimals-limit'
 
-# Clicking the numbers: off does nothing, on opens the usage window.
+# Clicking and hovering the numbers: each can do nothing, show the usage card or open the usage window.
+function Post-To-Readout($message) { [NetSpeedGaugeTools.Win]::PostMessage($readout, $message, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null; Start-Sleep -Milliseconds 700 }
+function Usage-Is-Open { (Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage') -ne [IntPtr]::Zero }
+function Card-Is-Open { (Find-Window 'NetSpeedGaugePopup' 'NetSpeedGauge') -ne [IntPtr]::Zero }
+function Close-Usage { [NetSpeedGaugeTools.Win]::PostMessage((Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage'), $WM_CLOSE, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null; Start-Sleep -Milliseconds 500 }
+function Post-To-Window($handle, $message, $wparam) { [NetSpeedGaugeTools.Win]::PostMessage($handle, $message, [IntPtr]$wparam, [IntPtr]::Zero) | Out-Null; Start-Sleep -Milliseconds 700 }
+$WM_MOUSEHOVER = 0x02A1
+$WM_MOUSELEAVE = 0x02A3
+$WM_ACTIVATE = 0x0006
+$hoverRow = 225
+$clickRow = 279
+$nothingX = 404
+$cardX = 487
+$windowX = 589
+
 Click $settings 90 240
-if ((Saved 'click_opens_usage') -ne '0') { Click $settings 400 225 }
-Check 'click choice saves as off' ((Saved 'click_opens_usage') -eq '0')
+Click $settings $nothingX $clickRow
+Check 'click choice saves as nothing' ((Saved 'click_action') -eq '0')
 Save-Window $settings 'settings-advanced'
+Post-To-Readout $WM_LBUTTONUP
+Check 'click does nothing when set to nothing' (-not (Usage-Is-Open) -and -not (Card-Is-Open))
+
+Click $settings $cardX $clickRow
+Check 'click choice saves as card' ((Saved 'click_action') -eq '1')
+Post-To-Readout $WM_LBUTTONUP
+Check 'click shows the card' ((Card-Is-Open) -and -not (Usage-Is-Open))
+Post-To-Readout $WM_MOUSELEAVE
+Check 'moving away leaves a clicked card open' (Card-Is-Open)
+Post-To-Readout $WM_LBUTTONUP
+Check 'a second click closes the card' (-not (Card-Is-Open))
+Post-To-Readout $WM_LBUTTONUP
+Post-To-Window (Find-Window 'NetSpeedGaugePopup' 'NetSpeedGauge') $WM_ACTIVATE 0
+Check 'clicking elsewhere closes a clicked card' (-not (Card-Is-Open))
+
+Click $settings $windowX $clickRow
+Check 'click choice saves as window' ((Saved 'click_action') -eq '2')
+Post-To-Readout $WM_LBUTTONUP
+Check 'click opens the usage window' (Usage-Is-Open)
+Post-To-Readout $WM_MOUSELEAVE
+Check 'moving away leaves a clicked window open' (Usage-Is-Open)
+Post-To-Window (Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage') $WM_ACTIVATE (1 -shl 16)
+Check 'minimizing does not count as clicking elsewhere' (Usage-Is-Open)
+Post-To-Readout $WM_LBUTTONUP
+Check 'a second click closes the window' (-not (Usage-Is-Open))
+Post-To-Readout $WM_LBUTTONUP
+Post-To-Window (Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage') $WM_ACTIVATE 0
+Check 'clicking elsewhere closes a clicked window' (-not (Usage-Is-Open))
+
+Click $settings $nothingX $hoverRow
+Check 'hover choice saves as nothing' ((Saved 'hover_action') -eq '0')
+Post-To-Readout $WM_MOUSEHOVER
+Check 'hover does nothing when set to nothing' (-not (Usage-Is-Open) -and -not (Card-Is-Open))
+
+Click $settings $windowX $hoverRow
+Check 'hover choice saves as window' ((Saved 'hover_action') -eq '2')
+[NetSpeedGaugeTools.Win]::PostMessage($readout, $WM_MOUSEHOVER, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+Start-Sleep -Milliseconds 100
+Check 'hover opens the usage window' (Usage-Is-Open)
+# This real mouse is not on the numbers or the window, so the window must close by itself. Skipped if it is.
+$usageArea = New-Object NetSpeedGaugeTools.Win+RECT
+[NetSpeedGaugeTools.Win]::GetWindowRect((Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage'), [ref]$usageArea) | Out-Null
+$mouse = [Windows.Forms.Cursor]::Position
+if ($mouse.X -ge $usageArea.L -and $mouse.X -lt $usageArea.R -and $mouse.Y -ge $usageArea.T -and $mouse.Y -lt 1080) {
+    'SKIP  moving away closes a hovered window (the mouse is over it)'
+    Close-Usage
+} else {
+    Start-Sleep -Milliseconds 900
+    Check 'moving away closes a hovered window' (-not (Usage-Is-Open))
+}
+[NetSpeedGaugeTools.Win]::PostMessage($readout, $WM_MOUSEHOVER, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+Start-Sleep -Milliseconds 100
 [NetSpeedGaugeTools.Win]::PostMessage($readout, $WM_LBUTTONUP, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
-Start-Sleep -Milliseconds 700
-Check 'click on the numbers does nothing when off' ((Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage') -eq [IntPtr]::Zero)
-Click $settings 400 225
-Check 'click choice saves as on' ((Saved 'click_opens_usage') -eq '1')
-[NetSpeedGaugeTools.Win]::PostMessage($readout, $WM_LBUTTONUP, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
-Start-Sleep -Milliseconds 700
-$clickedUsage = Find-Window 'NetSpeedGaugeUsage' 'NetSpeedGauge Usage'
-Check 'click on the numbers opens Usage when on' ($clickedUsage -ne [IntPtr]::Zero)
-[NetSpeedGaugeTools.Win]::PostMessage($clickedUsage, $WM_CLOSE, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
-Start-Sleep -Milliseconds 500
+Start-Sleep -Milliseconds 900
+Check 'a click pins a hovered window' (Usage-Is-Open)
+Post-To-Readout $WM_MOUSEHOVER
+Check 'hovering leaves a pinned window alone' (Usage-Is-Open)
+Close-Usage
+
+Click $settings $cardX $hoverRow
+Check 'hover choice saves as card' ((Saved 'hover_action') -eq '1')
+Post-To-Readout $WM_MOUSEHOVER
+Check 'hover shows the card' (Card-Is-Open)
+Post-To-Readout $WM_MOUSELEAVE
+Check 'moving away closes a hover card' (-not (Card-Is-Open))
+Check 'old on or off names are gone from the file' (-not (Select-String -Path $settingsFile -Pattern 'click_opens_usage|hover_card' -Quiet))
 
 # About page.
 Click $settings 90 280

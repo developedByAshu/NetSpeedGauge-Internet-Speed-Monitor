@@ -2,7 +2,7 @@
 
 use netspeedgauge::format::{Scale, Unit};
 use netspeedgauge::net_counters::InterfaceMode;
-use netspeedgauge::settings::{Field, Settings, COLOR_AUTO, FIELDS};
+use netspeedgauge::settings::{Field, MeterAction, Settings, COLOR_AUTO, FIELDS};
 use netspeedgauge::settings_ui::{page_fields, speed_color};
 use netspeedgauge::theme::figure_color;
 
@@ -117,9 +117,37 @@ fn settings_with_no_effect_are_reported_and_keep_their_values() {
 }
 
 #[test]
-fn clicking_the_numbers_opens_usage_by_default_and_can_be_turned_off() {
-    assert!(Settings::default().is_on(Field::ClickOpensUsage));
-    assert!(!Settings::from_text("click_opens_usage=0\n").is_on(Field::ClickOpensUsage));
+fn hover_shows_the_card_and_click_opens_usage_by_default() {
+    let settings = Settings::default();
+    assert_eq!(settings.meter_action(Field::HoverAction), MeterAction::Card);
+    assert_eq!(settings.meter_action(Field::ClickAction), MeterAction::UsageWindow);
+}
+
+#[test]
+fn old_on_off_choices_carry_over() {
+    let both_off = Settings::from_text("hover_card=0\nclick_opens_usage=0\n");
+    assert_eq!(both_off.meter_action(Field::HoverAction), MeterAction::Nothing);
+    assert_eq!(both_off.meter_action(Field::ClickAction), MeterAction::Nothing);
+    let both_on = Settings::from_text("hover_card=1\nclick_opens_usage=1\n");
+    assert_eq!(both_on, Settings::default());
+}
+
+#[test]
+fn any_action_can_go_on_hover_or_click_and_is_saved() {
+    let mut settings = Settings::default();
+    settings.set(Field::HoverAction, 0);
+    settings.set(Field::ClickAction, 1);
+    let reloaded = Settings::from_text(&settings.to_text());
+    assert_eq!(reloaded.meter_action(Field::HoverAction), MeterAction::Nothing);
+    assert_eq!(reloaded.meter_action(Field::ClickAction), MeterAction::Card);
+    assert!(!settings.to_text().contains("click_opens_usage"));
+}
+
+#[test]
+fn an_action_out_of_range_stays_in_range() {
+    let settings = Settings::from_text("hover_action=9\nclick_action=-3\n");
+    assert_eq!(settings.meter_action(Field::HoverAction), MeterAction::UsageWindow);
+    assert_eq!(settings.meter_action(Field::ClickAction), MeterAction::Nothing);
 }
 
 #[test]

@@ -8,7 +8,7 @@ use netspeedgauge::net_counters::{list_adapters, read_counters, Counter, DeltaTr
 use netspeedgauge::popup_ui;
 use netspeedgauge::readout::{Readout, ReadoutColors};
 use netspeedgauge::settings::{
-    Field, Settings, WM_APP_EXIT, WM_APP_OPEN_SETTINGS, WM_APP_OPEN_USAGE, WM_APP_SETTINGS_CHANGED,
+    Field, MeterAction, Settings, WM_APP_EXIT, WM_APP_OPEN_SETTINGS, WM_APP_OPEN_USAGE, WM_APP_SETTINGS_CHANGED,
 };
 use netspeedgauge::settings_ui::{self, speed_color};
 use netspeedgauge::taskbar_dock::{
@@ -16,7 +16,7 @@ use netspeedgauge::taskbar_dock::{
 };
 use netspeedgauge::theme::{app_icon, set_icon_colors, set_theme_choice};
 use netspeedgauge::usage_store::{data_folder, UsageStore};
-use netspeedgauge::usage_ui;
+use netspeedgauge::usage_ui::{self, OpenedBy};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -38,9 +38,9 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, IsWindow, LoadCursorW,
     PostMessageW, PostQuitMessage, RegisterClassW, SetCoalescableTimer, SetWindowPos, ShowWindow,
-    TranslateMessage, EVENT_SYSTEM_FOREGROUND, HWND_TOP, IDC_ARROW, MSG, SWP_NOACTIVATE, SWP_NOMOVE,
+    TranslateMessage, EVENT_SYSTEM_FOREGROUND, HWND_TOP, IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_NOMOVE,
     SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
-    WM_APP, WM_DESTROY, WM_ENDSESSION, WM_LBUTTONUP, WM_MOUSEMOVE, WM_POWERBROADCAST, WM_QUERYENDSESSION,
+    WM_APP, WM_DESTROY, WM_ENDSESSION, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_POWERBROADCAST, WM_QUERYENDSESSION,
     WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE,
     WS_EX_NOPARENTNOTIFY, WS_EX_TOOLWINDOW, WS_POPUP,
 };
@@ -376,11 +376,11 @@ fn shared_state() -> Option<(Rc<RefCell<UsageStore>>, Rc<RefCell<Settings>>)> {
 }
 
 /// Opens the usage window.
-fn open_usage(window: HWND) {
+fn open_usage(window: HWND, opened_by: OpenedBy) {
     if let Some((usage, settings)) = shared_state() {
         popup_ui::close();
         let keep_on_top = settings.borrow().is_on(Field::KeepOnTop);
-        usage_ui::open(usage, window, keep_on_top);
+        usage_ui::open(usage, window, keep_on_top, opened_by);
     }
 }
 
@@ -390,6 +390,43 @@ fn open_settings(window: HWND) {
         popup_ui::close();
         let keep_on_top = settings.borrow().is_on(Field::KeepOnTop);
         settings_ui::open(settings, window, keep_on_top);
+    }
+}
+
+/// Does what the user chose for resting on the numbers. It closes again when the mouse leaves.
+fn run_hover_action(window: HWND) {
+    let Some((usage, settings)) = shared_state() else {
+        return;
+    };
+    let action = settings.borrow().meter_action(Field::HoverAction);
+    match action {
+        MeterAction::Nothing => {}
+        MeterAction::Card => popup_ui::show_hover_card(&usage.borrow(), window),
+        // Passing over the numbers must not disturb anything already open.
+        MeterAction::UsageWindow if usage_ui::opened_by().is_some() || popup_ui::is_open() => {}
+        MeterAction::UsageWindow => open_usage(window, OpenedBy::Hover),
+    }
+}
+
+/// Does what the user chose for a click. It stays until the next click, and a click pins what a hover opened.
+fn run_click_action(window: HWND) {
+    let Some((usage, settings)) = shared_state() else {
+        return;
+    };
+    let action = settings.borrow().meter_action(Field::ClickAction);
+    match action {
+        MeterAction::Nothing => {}
+        MeterAction::Card if popup_ui::is_pinned_card_open() => popup_ui::close(),
+        MeterAction::Card => {
+            if usage_ui::opened_by() == Some(OpenedBy::Hover) {
+                usage_ui::close();
+            }
+            popup_ui::show_pinned_card(&usage.borrow(), window);
+        }
+        MeterAction::UsageWindow => match usage_ui::opened_by() {
+            None | Some(OpenedBy::Hover) => open_usage(window, OpenedBy::Click),
+            Some(_) => usage_ui::close(),
+        },
     }
 }
 
@@ -404,14 +441,8 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
                 popup_ui::show_menu(&usage.borrow(), window);
             }
         }
-        WM_LBUTTONUP => {
-            if let Some((_, settings)) = shared_state() {
-                if settings.borrow().is_on(Field::ClickOpensUsage) {
-                    open_usage(window);
-                }
-            }
-        }
-        WM_APP_OPEN_USAGE => open_usage(window),
+        WM_LBUTTONUP => run_click_action(window),
+        WM_APP_OPEN_USAGE => open_usage(window, OpenedBy::Menu),
         WM_APP_OPEN_SETTINGS => open_settings(window),
         WM_APP_SETTINGS_CHANGED => with_app(App::apply_settings),
         WM_APP_EXIT => {
@@ -420,11 +451,7 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
         WM_MOUSEMOVE => with_app(App::track_mouse),
         WM_MOUSEHOVER => {
             with_app(|app| app.is_tracking_mouse = false);
-            if let Some((usage, settings)) = shared_state() {
-                if settings.borrow().is_on(Field::HoverCard) {
-                    popup_ui::show_hover_card(&usage.borrow(), window);
-                }
-            }
+            run_hover_action(window);
         }
         WM_MOUSELEAVE => {
             with_app(|app| app.is_tracking_mouse = false);
@@ -450,6 +477,8 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
 /// Hands the meter's mouse messages to the main window, which owns the popups they open.
 unsafe extern "system" fn meter_proc(meter: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match message {
+        // Without this a click activates the taskbar, closing an open card or window before the click can toggle it.
+        WM_MOUSEACTIVATE => MA_NOACTIVATE as LRESULT,
         WM_RBUTTONUP | WM_LBUTTONUP | WM_MOUSEMOVE | WM_MOUSEHOVER | WM_MOUSELEAVE => {
             let window = WINDOW.with(|cell| *cell.borrow());
             window_proc(window, message, wparam, lparam)

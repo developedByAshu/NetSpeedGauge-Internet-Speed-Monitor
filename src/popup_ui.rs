@@ -116,6 +116,8 @@ struct Popup {
     width: i32,
     totals: Totals,
     is_menu: bool,
+    // A card opened by a click stays until the next click, here or anywhere else.
+    is_pinned: bool,
     hover_row: Option<usize>,
     is_tracking_mouse: bool,
 }
@@ -341,7 +343,7 @@ unsafe extern "system" fn popup_proc(window: HWND, message: u32, wparam: WPARAM,
 }
 
 /// Opens a popup just above the readout.
-fn open(store: &UsageStore, anchor: HWND, is_menu: bool) {
+fn open(store: &UsageStore, anchor: HWND, is_menu: bool, is_pinned: bool) {
     close();
     let totals = read_totals(store);
     let class_name = to_wide(CLASS_NAME);
@@ -374,7 +376,9 @@ fn open(store: &UsageStore, anchor: HWND, is_menu: bool) {
         GetWindowRect(anchor, &mut anchor_area);
         let x = anchor_area.right - width;
         let y = anchor_area.top - height - scale(GAP_ABOVE_TASKBAR);
-        let extra_style = if is_menu { 0 } else { WS_EX_NOACTIVATE };
+        // Only a popup that takes focus can tell when the user clicks somewhere else.
+        let takes_focus = is_menu || is_pinned;
+        let extra_style = if takes_focus { 0 } else { WS_EX_NOACTIVATE };
         let window = CreateWindowExW(
             WS_EX_TOOLWINDOW | WS_EX_TOPMOST | extra_style,
             class_name.as_ptr(),
@@ -401,11 +405,12 @@ fn open(store: &UsageStore, anchor: HWND, is_menu: bool) {
             width,
             totals,
             is_menu,
+            is_pinned,
             hover_row: None,
             is_tracking_mouse: false,
         };
         OPEN_POPUP.with(|cell| *cell.borrow_mut() = Some(popup));
-        if is_menu {
+        if takes_focus {
             ShowWindow(window, SW_SHOW);
             SetForegroundWindow(window);
             SetFocus(window);
@@ -417,7 +422,12 @@ fn open(store: &UsageStore, anchor: HWND, is_menu: bool) {
 
 /// Opens the right-click menu.
 pub fn show_menu(store: &UsageStore, anchor: HWND) {
-    open(store, anchor, true);
+    open(store, anchor, true, false);
+}
+
+/// Opens the card for a click. Unlike the hover card, it stays when the mouse moves away.
+pub fn show_pinned_card(store: &UsageStore, anchor: HWND) {
+    open(store, anchor, false, true);
 }
 
 /// Opens the hover card with today's and this month's totals, unless a menu is showing.
@@ -425,14 +435,28 @@ pub fn show_hover_card(store: &UsageStore, anchor: HWND) {
     let mut is_open = false;
     with_popup(|_| is_open = true);
     if !is_open {
-        open(store, anchor, false);
+        open(store, anchor, false, false);
     }
 }
 
-/// Closes the hover card, leaving a menu open.
+/// Returns true while a card opened by a click is showing, so the next click can close it.
+pub fn is_pinned_card_open() -> bool {
+    let mut is_open = false;
+    with_popup(|popup| is_open = popup.is_pinned);
+    is_open
+}
+
+/// Returns true while any popup is showing.
+pub fn is_open() -> bool {
+    let mut is_open = false;
+    with_popup(|_| is_open = true);
+    is_open
+}
+
+/// Closes the hover card when the mouse leaves, leaving a menu or a pinned card open.
 pub fn hide_hover_card() {
     with_popup(|popup| {
-        if !popup.is_menu {
+        if !popup.is_menu && !popup.is_pinned {
             // SAFETY: the window is valid while this state exists.
             unsafe { PostMessageW(popup.window, WM_APP_CLOSE_POPUP, 0, 0) };
         }

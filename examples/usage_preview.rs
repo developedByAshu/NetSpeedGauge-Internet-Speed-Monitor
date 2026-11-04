@@ -52,7 +52,7 @@ fn main() {
     unsafe {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let anchor = FindWindowW(class.as_ptr(), std::ptr::null());
-        usage_ui::open(Rc::new(RefCell::new(sample_store())), anchor, false);
+        usage_ui::open(Rc::new(RefCell::new(sample_store())), anchor, false, usage_ui::OpenedBy::Menu);
         usage_ui::preview_theme(theme != "light");
         let mut message: MSG = std::mem::zeroed();
         while GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {

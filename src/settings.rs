@@ -67,11 +67,22 @@ pub enum Field {
     OffsetY,
     InterfaceMode,
     KeepHistory,
-    HoverCard,
+    HoverAction,
     KeepOnTop,
     WindowTheme,
-    ClickOpensUsage,
+    ClickAction,
 }
+
+/// What resting on or clicking the numbers does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MeterAction {
+    Nothing,
+    Card,
+    UsageWindow,
+}
+
+// Older versions saved these as on or off. On matches today's defaults, so only off carries over.
+const OLD_ON_OFF_KEYS: [(&str, Field); 2] = [("hover_card", Field::HoverAction), ("click_opens_usage", Field::ClickAction)];
 
 /// A choice's name in the file, starting value and limits.
 pub struct FieldSpec {
@@ -115,10 +126,10 @@ pub const FIELDS: [FieldSpec; 30] = [
     spec(Field::OffsetY, "offset_y", 0, -20, 20),
     spec(Field::InterfaceMode, "interface_mode", 0, 0, 2),
     spec(Field::KeepHistory, "keep_history", 3, 0, 3),
-    spec(Field::HoverCard, "hover_card", 1, 0, 1),
+    spec(Field::HoverAction, "hover_action", 1, 0, 2),
     spec(Field::KeepOnTop, "keep_on_top", 0, 0, 1),
     spec(Field::WindowTheme, "window_theme", 0, 0, 2),
-    spec(Field::ClickOpensUsage, "click_opens_usage", 1, 0, 1),
+    spec(Field::ClickAction, "click_action", 2, 0, 2),
 ];
 
 /// All the user's choices.
@@ -156,6 +167,15 @@ impl Settings {
     /// Puts one choice back to its default.
     pub fn reset(&mut self, field: Field) {
         self.values[field as usize] = FIELDS[field as usize].default;
+    }
+
+    /// Returns what the hover or click choice asks for.
+    pub fn meter_action(&self, field: Field) -> MeterAction {
+        match self.get(field) {
+            1 => MeterAction::Card,
+            2 => MeterAction::UsageWindow,
+            _ => MeterAction::Nothing,
+        }
     }
 
     /// Returns a colour choice, or the given colour when it is on automatic.
@@ -246,6 +266,10 @@ impl Settings {
             };
             if key == CHOSEN_ADAPTERS_KEY {
                 settings.chosen_adapters = value.split(',').filter_map(|luid| luid.parse().ok()).collect();
+            } else if let Some((_, field)) = OLD_ON_OFF_KEYS.iter().find(|(old_key, _)| *old_key == key) {
+                if value.trim() == "0" {
+                    settings.set(*field, 0);
+                }
             } else if let (Some(spec), Ok(number)) =
                 (FIELDS.iter().find(|spec| spec.key == key), value.trim().parse::<i64>())
             {
