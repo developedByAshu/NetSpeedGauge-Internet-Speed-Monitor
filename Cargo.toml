@@ -1,6 +1,6 @@
 [package]
 name = "netspeedgauge"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Tiny internet speed monitor for the Windows taskbar"
 license = "GPL-3.0-only"
