@@ -4,6 +4,7 @@ use crate::canvas::{self, Align, Font};
 use crate::surface::main_thread;
 use netspeedgauge_shared::palette::{dark_palette, figure_color, light_palette};
 pub use netspeedgauge_shared::palette::Theme;
+use objc2::rc::Retained;
 use objc2_app_kit::{NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSColor, NSColorSpace, NSWindow};
 use std::sync::atomic::{AtomicI64, Ordering};
 
@@ -98,11 +99,16 @@ pub fn draw_footer_strip(theme: &Theme, top: i32, width: i32, height: i32, font:
     draw_made_with_love(width / 2, top + (height - font.box_height) / 2, font, theme.muted);
 }
 
-/// Makes a title bar match its window, so the two read as one surface.
-pub fn apply_title_bar(window: &NSWindow, theme: &Theme) {
+/// Returns the Mac's own light or dark look for a theme.
+pub fn appearance_for(theme: &Theme) -> Option<Retained<NSAppearance>> {
     // SAFETY: these are AppKit's own constants.
     let name = unsafe { if theme.is_dark { NSAppearanceNameDarkAqua } else { NSAppearanceNameAqua } };
-    window.setAppearance(NSAppearance::appearanceNamed(name).as_deref());
+    NSAppearance::appearanceNamed(name)
+}
+
+/// Makes a title bar match its window, so the two read as one surface.
+pub fn apply_title_bar(window: &NSWindow, theme: &Theme) {
+    window.setAppearance(appearance_for(theme).as_deref());
     window.setBackgroundColor(Some(&canvas::color(theme.background)));
     window.setTitlebarAppearsTransparent(true);
 }
