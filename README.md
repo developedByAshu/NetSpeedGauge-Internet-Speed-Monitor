@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest"><img src="https://img.shields.io/badge/Download-2563EB?style=for-the-badge" alt="Download"></a>
+  <a href="https://github.com/developedByAshu/net-speed-gauge/releases/latest"><img src="https://img.shields.io/badge/Download-2563EB?style=for-the-badge" alt="Download"></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor?label=version" alt="Latest version">
+  <img src="https://img.shields.io/github/v/release/developedByAshu/net-speed-gauge?label=version" alt="Latest version">
   <img src="https://img.shields.io/badge/Windows-10_%7C_11-2563EB" alt="Windows 10 and 11">
   <img src="https://img.shields.io/badge/Mac-Apple_silicon-2563EB" alt="Mac with Apple silicon">
   <img src="https://img.shields.io/badge/licence-GPL--3.0-16A34A" alt="GPL-3.0 licence">
@@ -87,7 +87,7 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
 
 ### Windows
 
-1. Download `NetSpeedGauge-x64.exe` from [Releases](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest). On a Windows on ARM PC, take `NetSpeedGauge-arm64.exe`.
+1. Download `NetSpeedGauge-x64.exe` from [Releases](https://github.com/developedByAshu/net-speed-gauge/releases/latest). On a Windows on ARM PC, take `NetSpeedGauge-arm64.exe`.
 2. Put it in a folder you will keep, then run it.
 3. To open it at sign in, turn on **Start with Windows** in Settings.
 
@@ -99,7 +99,7 @@ To remove it, turn off **Start with Windows**, choose **Exit**, then delete the 
 
 ### Mac (Apple silicon only)
 
-1. Download `NetSpeedGauge-mac-arm64.zip` from [Releases](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest) and unzip it.
+1. Download `NetSpeedGauge-mac-arm64.zip` from [Releases](https://github.com/developedByAshu/net-speed-gauge/releases/latest) and unzip it.
 2. Move `NetSpeedGauge` to Applications, then open it.
 3. macOS blocks it the first time because the app is not signed by Apple. Open **System Settings**, **Privacy & Security**, choose **Open Anyway**, then open it again.
 4. To open it at login, turn on **Start at login** in Settings.
@@ -110,7 +110,7 @@ To remove it, turn off **Start at login**, choose **Quit**, then delete the app 
 
 ## Works on
 
-Tested on Windows 11 and on macOS 27 with Apple silicon. It should also work on Windows 10, Windows on ARM and macOS 12 or later, but I have not tested those. There is no version for Intel Macs. If something breaks, [open an issue](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/issues).
+Tested on Windows 11 and on macOS 27 with Apple silicon. It should also work on Windows 10, Windows on ARM and macOS 12 or later, but I have not tested those. There is no version for Intel Macs. If something breaks, [open an issue](https://github.com/developedByAshu/net-speed-gauge/issues).
 
 On Windows it shows on the main taskbar only.
 
