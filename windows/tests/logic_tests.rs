@@ -2,7 +2,8 @@
 
 use netspeedgauge_windows::canvas::round_rect_coverage;
 use netspeedgauge_windows::net_counters::is_physical;
-use netspeedgauge_windows::readout::{arrow_column_left, tint_pixel};
+use netspeedgauge_windows::popup_ui::{slide_in_offset, slide_out_offset};
+use netspeedgauge_windows::readout::{arrow_column_left, selected_colors, tint_pixel, ReadoutColors};
 use netspeedgauge_windows::startup::startup_command;
 use netspeedgauge_windows::taskbar_dock::{covers_monitor, is_taskbar_collapsed, place_readout, to_taskbar_coords};
 use windows_sys::Win32::Foundation::RECT;
@@ -123,4 +124,49 @@ fn rounded_rectangle_covers_its_middle_and_trims_its_corner() {
     assert_eq!(cover(25.0, 10.0), 0.0);
     let edge_of_corner = cover(1.76, 1.76);
     assert!(edge_of_corner > 0.0 && edge_of_corner < 1.0);
+}
+
+fn plain_colors(background: u32, background_alpha: u32) -> ReadoutColors {
+    ReadoutColors { up_arrow: 1, down_arrow: 2, up_value: 3, down_value: 4, background, background_alpha }
+}
+
+#[test]
+fn selected_numbers_with_no_background_get_a_soft_one_in_the_taskbar_text_colour() {
+    let selected = selected_colors(&plain_colors(0, 0), 0x00FF_FFFF);
+    assert_eq!(selected.background, 0x00FF_FFFF);
+    assert!(selected.background_alpha > 0 && selected.background_alpha < 64);
+}
+
+#[test]
+fn selected_numbers_shift_a_chosen_background_and_keep_its_strength() {
+    let selected = selected_colors(&plain_colors(0x0020_2020, 200), 0x00FF_FFFF);
+    assert_ne!(selected.background, 0x0020_2020);
+    assert_eq!(selected.background_alpha, 200);
+}
+
+#[test]
+fn selected_look_never_changes_the_number_colours() {
+    let selected = selected_colors(&plain_colors(0, 0), 0x00FF_FFFF);
+    assert_eq!((selected.up_arrow, selected.down_arrow, selected.up_value, selected.down_value), (1, 2, 3, 4));
+}
+
+#[test]
+fn slide_in_starts_fully_down_and_lands_exactly_in_place() {
+    assert_eq!(slide_in_offset(0.0), 1.0);
+    assert_eq!(slide_in_offset(180.0), 0.0);
+    assert_eq!(slide_in_offset(100_000.0), 0.0);
+}
+
+#[test]
+fn slide_in_slows_as_it_arrives() {
+    let first_half = slide_in_offset(0.0) - slide_in_offset(90.0);
+    let second_half = slide_in_offset(90.0) - slide_in_offset(180.0);
+    assert!(first_half > second_half);
+}
+
+#[test]
+fn slide_out_ends_fully_down_and_speeds_up_as_it_leaves() {
+    assert_eq!(slide_out_offset(0.0), 0.0);
+    assert_eq!(slide_out_offset(160.0), 1.0);
+    assert!(slide_out_offset(80.0) < 0.5);
 }

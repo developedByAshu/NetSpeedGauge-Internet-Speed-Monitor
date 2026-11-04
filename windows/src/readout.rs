@@ -1,6 +1,6 @@
 //! Draws the two speed rows into a see-through window using plain Windows drawing.
 
-use crate::canvas::round_rect_coverage;
+use crate::canvas::{mix, round_rect_coverage};
 use crate::format::widest_speed_text;
 use crate::settings::{Field, Settings};
 use crate::taskbar_dock::to_wide;
@@ -32,6 +32,12 @@ const BOX_RADIUS: i32 = 6;
 
 // Near-invisible background so the empty parts of the window still receive mouse clicks.
 const CLICKABLE_ALPHA: u32 = 1;
+
+// The background behind the numbers while their menu or card is open. Measured from Windows' own selected
+// tray highlight on a dark taskbar: colour 41 over 28, which is 6% of white, and 40 pixels tall at 100% scaling.
+const SELECTED_ALPHA: u32 = 15;
+const SELECTED_MIX: f32 = 0.06;
+const SELECTED_HEIGHT: i32 = 40;
 
 /// The colours for one drawing of the readout, as 0xRRGGBB.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,6 +71,7 @@ pub struct Readout {
     arrows: (&'static str, &'static str),
     is_swapped: bool,
     dpi: u32,
+    room_for_selected: i32,
 }
 
 /// Returns the pixel size of a string in the current font.
@@ -116,6 +123,19 @@ fn draw_text(surface: HDC, x: i32, y: i32, text: &str) {
 }
 
 /**
+ * Returns the colours for numbers whose menu or card is open. Only the background changes: with none
+ * set it gets a soft one in the taskbar's text colour, and a chosen one shifts towards that colour.
+ */
+pub fn selected_colors(colors: &ReadoutColors, taskbar_text: u32) -> ReadoutColors {
+    let (background, background_alpha) = if colors.background_alpha == 0 {
+        (taskbar_text, SELECTED_ALPHA)
+    } else {
+        (mix(colors.background, taskbar_text, SELECTED_MIX), colors.background_alpha)
+    };
+    ReadoutColors { background, background_alpha, ..*colors }
+}
+
+/**
  * Converts one drawn pixel to its final colour. Windows' text drawing has no transparency, so text
  * is drawn white on black and its brightness becomes how see-through the pixel is, over an optional
  * background colour.
@@ -148,8 +168,8 @@ impl Readout {
         let arrow_stroke = settings.icon_stroke(dpi);
         // SAFETY: the surface and fonts are owned by this struct and released in Drop.
         let has_background = settings.background().is_some();
-        let box_padding = if has_background { BOX_SIDE_PADDING * dpi as i32 / BASE_DPI } else { 0 };
-        let top_offset = if has_background { BOX_TOP_PADDING * dpi as i32 / BASE_DPI } else { 0 };
+        // Reserved even with no background, so the selected look has the same room around the numbers.
+        let box_padding = BOX_SIDE_PADDING * dpi as i32 / BASE_DPI;
         let box_radius = (BOX_RADIUS * dpi as i32 / BASE_DPI) as f32;
         let (surface, row_height, width, arrow_gap, arrow_width) = unsafe {
             let surface = CreateCompatibleDC(std::ptr::null_mut());
@@ -164,7 +184,13 @@ impl Readout {
             let width = arrow_width + arrow_stroke + arrow_gap + measure(surface, &widest).cx + (SIDE_PADDING + box_padding) * 2;
             (surface, metrics.tmHeight, width, arrow_gap, arrow_width)
         };
-        let height = row_height * 2 + row_gap + top_offset * 2;
+        let rows_height = row_height * 2 + row_gap;
+        let top_offset = if has_background {
+            BOX_TOP_PADDING * dpi as i32 / BASE_DPI
+        } else {
+            ((SELECTED_HEIGHT * dpi as i32 / BASE_DPI - rows_height) / 2).max(0)
+        };
+        let height = rows_height + top_offset * 2;
         // SAFETY: the header describes a top-down 32-bit bitmap, and `pixels` receives its memory.
         let (bitmap, pixels) = unsafe {
             let mut info: BITMAPINFO = std::mem::zeroed();
@@ -182,12 +208,17 @@ impl Readout {
         let row_step = row_height + row_gap;
         let value_right = width - SIDE_PADDING - box_padding;
         let is_swapped = settings.is_on(Field::SwapRows);
-        Self { window, surface, bitmap, font, arrow_font, pixels, width, height, row_step, value_right, arrow_gap, arrow_stroke, arrow_width, top_offset, box_padding, box_radius, arrows, is_swapped, dpi }
+        Self { window, surface, bitmap, font, arrow_font, pixels, width, height, row_step, value_right, arrow_gap, arrow_stroke, arrow_width, top_offset, box_padding, box_radius, arrows, is_swapped, dpi, room_for_selected: if has_background { 0 } else { box_padding } }
     }
 
     /// Returns the screen scaling this surface was built for.
     pub fn dpi(&self) -> u32 {
         self.dpi
+    }
+
+    /// Returns the side space reserved only for the selected look, so the numbers can stay put without it showing.
+    pub fn room_for_selected(&self) -> i32 {
+        self.room_for_selected
     }
 
     /// Draws both rows and puts them on screen.
@@ -230,7 +261,7 @@ impl Readout {
         unsafe { GdiFlush() };
 
         // The background hugs the arrows and numbers, with padding and rounded corners.
-        let box_left = (arrow_left - self.box_padding).max(0) as f32;
+        let box_left = (arrow_left - self.box_padding - SIDE_PADDING).max(0) as f32;
         let box_width = self.width as f32 - box_left;
         let box_height = self.height as f32;
         for (index, pixel) in pixels.iter_mut().enumerate() {

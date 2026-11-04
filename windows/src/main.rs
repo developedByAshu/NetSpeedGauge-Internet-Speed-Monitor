@@ -6,12 +6,12 @@ use netspeedgauge_windows::calendar;
 use netspeedgauge_windows::format::{format_speed, SpeedFormat};
 use netspeedgauge_windows::net_counters::{list_adapters, read_counters, Counter, DeltaTracker, InterfaceMode};
 use netspeedgauge_windows::popup_ui;
-use netspeedgauge_windows::readout::{Readout, ReadoutColors};
-use netspeedgauge_windows::messages::{WM_APP_EXIT, WM_APP_OPEN_SETTINGS, WM_APP_OPEN_USAGE, WM_APP_SETTINGS_CHANGED};
+use netspeedgauge_windows::readout::{selected_colors, Readout, ReadoutColors};
+use netspeedgauge_windows::messages::{WM_APP_EXIT, WM_APP_OPEN_SETTINGS, WM_APP_OPEN_USAGE, WM_APP_POPUP_CHANGED, WM_APP_SETTINGS_CHANGED};
 use netspeedgauge_windows::settings::{Field, MeterAction, Settings};
 use netspeedgauge_windows::settings_ui::{self, speed_color};
 use netspeedgauge_windows::taskbar_dock::{
-    find_taskbar, is_fullscreen_active, is_taskbar_collapsed, place_readout, to_taskbar_coords, to_wide,
+    find_taskbar, is_fullscreen_active, is_taskbar_collapsed, place_readout, to_taskbar_coords, to_wide, TRAY_GAP,
 };
 use netspeedgauge_windows::theme::{app_icon, set_icon_colors, set_theme_choice};
 use netspeedgauge_windows::usage_store::{catch_up_gap_secs, data_folder, UsageStore};
@@ -87,6 +87,7 @@ struct App {
     taskbar_text: u32,
     is_shown: bool,
     is_tracking_mouse: bool,
+    is_hovered: bool,
     position: (i32, i32),
     usage: Rc<RefCell<UsageStore>>,
     idle_ticks: u32,
@@ -185,6 +186,7 @@ impl App {
         self.taskbar = taskbar;
         self.is_shown = false;
         self.is_tracking_mouse = false;
+        self.is_hovered = false;
         true
     }
 
@@ -217,7 +219,11 @@ impl App {
             let settings = self.settings.borrow();
             (settings.get(Field::OffsetX) as i32, settings.get(Field::OffsetY) as i32)
         };
-        let position = (placed.0 + offset_x, placed.1 + offset_y);
+        // The numbers keep their place by using the gap to the tray, without covering the tray's clickable edge.
+        let is_horizontal = info.taskbar_rect.right - info.taskbar_rect.left >= info.taskbar_rect.bottom - info.taskbar_rect.top;
+        let gap = (f64::from(TRAY_GAP) * scale).round() as i32;
+        let shift = if is_horizontal { self.readout.room_for_selected().min(gap) } else { 0 };
+        let position = (placed.0 + shift + offset_x, placed.1 + offset_y);
         let flags = if position == self.position {
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
         } else {
@@ -236,6 +242,10 @@ impl App {
 
     /// Shows or hides the meter only when that actually changes.
     fn set_shown(&mut self, shown: bool) {
+        if !shown {
+            // A hidden meter gets no message when the mouse leaves it.
+            self.set_hovered(false);
+        }
         if shown != self.is_shown {
             self.is_shown = shown;
             // SAFETY: ShowWindow only fails on a meter that has died, and sync_position replaces those.
@@ -243,11 +253,25 @@ impl App {
         }
     }
 
+    /// Shows or clears the hover look, like the taskbar's own items do.
+    fn set_hovered(&mut self, hovered: bool) {
+        if hovered != self.is_hovered {
+            self.is_hovered = hovered;
+            self.update_readout();
+        }
+    }
+
+    /// Works out the readout's colours now, with the selected look on hover or while its menu or card is open.
+    fn current_colors(&self) -> ReadoutColors {
+        let colors = readout_colors(&self.settings.borrow(), self.taskbar_text, self.up_speed, self.down_speed);
+        if self.is_hovered || popup_ui::is_selected() { selected_colors(&colors, self.taskbar_text) } else { colors }
+    }
+
     /// Redraws the readout only when its text or colours changed.
     fn update_readout(&mut self) {
         let up_text = format_speed(self.up_speed, &self.format);
         let down_text = format_speed(self.down_speed, &self.format);
-        let colors = readout_colors(&self.settings.borrow(), self.taskbar_text, self.up_speed, self.down_speed);
+        let colors = self.current_colors();
         if up_text != self.up_text || down_text != self.down_text || colors != self.colors {
             self.up_text = up_text;
             self.down_text = down_text;
@@ -327,7 +351,7 @@ impl App {
         self.mode = settings.interface_mode();
         self.usage.borrow_mut().keep_days = settings.keep_days();
         self.readout = Readout::new(self.meter, self.readout.dpi(), &settings);
-        self.colors = readout_colors(&settings, self.taskbar_text, self.up_speed, self.down_speed);
+        self.colors = self.current_colors();
         self.up_text = format_speed(self.up_speed, &self.format);
         self.down_text = format_speed(self.down_speed, &self.format);
         self.readout.draw(&self.up_text, &self.down_text, &self.colors);
@@ -413,7 +437,7 @@ fn run_click_action(window: HWND) {
     let action = settings.borrow().meter_action(Field::ClickAction);
     match action {
         MeterAction::Nothing => {}
-        MeterAction::Card if popup_ui::is_pinned_card_open() => popup_ui::close(),
+        MeterAction::Card if popup_ui::is_pinned_card_open() => popup_ui::request_close(),
         MeterAction::Card => {
             if usage_ui::opened_by() == Some(OpenedBy::Hover) {
                 usage_ui::close();
@@ -442,16 +466,23 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
         WM_APP_OPEN_USAGE => open_usage(window, OpenedBy::Menu),
         WM_APP_OPEN_SETTINGS => open_settings(window),
         WM_APP_SETTINGS_CHANGED => with_app(App::apply_settings),
+        WM_APP_POPUP_CHANGED => with_app(App::update_readout),
         WM_APP_EXIT => {
             DestroyWindow(window);
         }
-        WM_MOUSEMOVE => with_app(App::track_mouse),
+        WM_MOUSEMOVE => with_app(|app| {
+            app.track_mouse();
+            app.set_hovered(true);
+        }),
         WM_MOUSEHOVER => {
             with_app(|app| app.is_tracking_mouse = false);
             run_hover_action(window);
         }
         WM_MOUSELEAVE => {
-            with_app(|app| app.is_tracking_mouse = false);
+            with_app(|app| {
+                app.is_tracking_mouse = false;
+                app.set_hovered(false);
+            });
             popup_ui::hide_hover_card();
         }
         WM_POWERBROADCAST | WM_ENDSESSION => with_app(App::save_usage),
@@ -588,6 +619,7 @@ fn main() {
             taskbar_text,
             is_shown: false,
             is_tracking_mouse: false,
+            is_hovered: false,
             position: (i32::MIN, i32::MIN),
             usage: Rc::new(RefCell::new(usage)),
             idle_ticks: 0,
