@@ -1,4 +1,5 @@
 1 ICON "netspeedgauge.ico"
+1 24 "netspeedgauge.manifest"
 
 1 VERSIONINFO
 FILEVERSION VERSION_MAJOR,VERSION_MINOR,VERSION_PATCH,0

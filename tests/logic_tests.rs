@@ -4,7 +4,7 @@ use netspeedgauge::format::{format_speed, widest_speed_text, Scale, SpeedFormat,
 use netspeedgauge::net_counters::{is_physical, Counter, DeltaTracker};
 use netspeedgauge::readout::{arrow_column_left, tint_pixel};
 use netspeedgauge::startup::startup_command;
-use netspeedgauge::taskbar_dock::{covers_monitor, is_taskbar_collapsed, place_readout};
+use netspeedgauge::taskbar_dock::{covers_monitor, is_taskbar_collapsed, place_readout, to_taskbar_coords};
 use windows_sys::Win32::Foundation::RECT;
 
 const TYPE_ETHERNET: u32 = 6;
@@ -88,6 +88,13 @@ fn fullscreen_means_covering_the_whole_monitor() {
     assert!(covers_monitor(&rect(0, 0, 1920, 1080), &monitor));
     assert!(covers_monitor(&rect(-8, -8, 1928, 1088), &monitor));
     assert!(!covers_monitor(&rect(0, 0, 1920, 1032), &monitor));
+}
+
+#[test]
+fn child_position_is_measured_from_the_taskbar_corner() {
+    assert_eq!(to_taskbar_coords((1543, 1039), &rect(0, 1032, 1920, 1080)), (1543, 7));
+    assert_eq!(to_taskbar_coords((6, 900), &rect(0, 0, 48, 1080)), (6, 900));
+    assert_eq!(to_taskbar_coords((2000, 1039), &rect(1920, 1032, 3840, 1080)), (80, 7));
 }
 
 #[test]

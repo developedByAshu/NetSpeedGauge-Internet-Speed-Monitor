@@ -3,6 +3,7 @@
 fn main() {
     println!("cargo:rerun-if-changed=assets/netspeedgauge.rc");
     println!("cargo:rerun-if-changed=assets/netspeedgauge.ico");
+    println!("cargo:rerun-if-changed=assets/netspeedgauge.manifest");
     let version_macros = ["MAJOR", "MINOR", "PATCH"].map(|part| {
         let value = std::env::var(format!("CARGO_PKG_VERSION_{part}")).expect("Cargo always sets the version");
         format!("VERSION_{part}={value}")

@@ -12,7 +12,7 @@ use netspeedgauge::settings::{
 };
 use netspeedgauge::settings_ui::{self, speed_color};
 use netspeedgauge::taskbar_dock::{
-    find_taskbar, is_fullscreen_active, is_taskbar_collapsed, place_readout, to_wide,
+    find_taskbar, is_fullscreen_active, is_taskbar_collapsed, place_readout, to_taskbar_coords, to_wide,
 };
 use netspeedgauge::theme::{app_icon, set_icon_colors, set_theme_choice};
 use netspeedgauge::usage_store::{data_folder, UsageStore};
@@ -36,13 +36,13 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     TrackMouseEvent, TME_HOVER, TME_LEAVE, TRACKMOUSEEVENT,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, LoadCursorW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, IsWindow, LoadCursorW,
     PostMessageW, PostQuitMessage, RegisterClassW, SetCoalescableTimer, SetWindowPos, ShowWindow,
-    TranslateMessage, EVENT_SYSTEM_FOREGROUND, HWND_TOPMOST, IDC_ARROW, MSG, SWP_NOACTIVATE, SWP_NOMOVE,
-    SWP_NOSIZE, SW_HIDE, SW_SHOWNOACTIVATE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP,
-    WM_DESTROY, WM_ENDSESSION, WM_LBUTTONUP, WM_MOUSEMOVE, WM_POWERBROADCAST, WM_QUERYENDSESSION,
-    WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    TranslateMessage, EVENT_SYSTEM_FOREGROUND, HWND_TOP, IDC_ARROW, MSG, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+    WM_APP, WM_DESTROY, WM_ENDSESSION, WM_LBUTTONUP, WM_MOUSEMOVE, WM_POWERBROADCAST, WM_QUERYENDSESSION,
+    WM_RBUTTONUP, WM_SETTINGCHANGE, WM_TIMER, WNDCLASSW, WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    WS_EX_NOPARENTNOTIFY, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 
 // The windows-sys crate does not export these messages, so they are declared here.
@@ -51,6 +51,7 @@ const WM_MOUSELEAVE: u32 = 0x02A3;
 
 const SINGLE_INSTANCE_NAME: &str = "Local\\NetSpeedGaugeSingleInstance";
 const WINDOW_CLASS_NAME: &str = "NetSpeedGaugeReadout";
+const METER_CLASS_NAME: &str = "NetSpeedGaugeMeter";
 const TIMER_ID: usize = 1;
 const TICK_TOLERANCE_MS: u32 = 100;
 const WM_APP_RESYNC: u32 = WM_APP + 1;
@@ -68,7 +69,11 @@ const SAME_BOOT_TOLERANCE_SECS: i64 = 120;
 
 /// Everything the readout keeps between ticks.
 struct App {
+    // Hidden, kept over the meter: runs the timer, owns the popups and anchors them.
     window: HWND,
+    // What shows on screen. A child of the taskbar, so it dies if Explorer restarts.
+    meter: HWND,
+    taskbar: HWND,
     readout: Readout,
     tracker: DeltaTracker,
     counters: Vec<Counter>,
@@ -155,17 +160,54 @@ fn readout_colors(settings: &Settings, automatic: u32, up_speed: f64, down_speed
 }
 
 impl App {
-    /// Moves the readout onto the taskbar, hides it when it must not show, and keeps it on top.
+    /// Makes a new meter inside the taskbar, the first time and whenever Explorer has restarted.
+    fn dock_meter(&mut self, taskbar: HWND) -> bool {
+        // SAFETY: the class is registered before the first tick, and DestroyWindow ignores a dead handle.
+        unsafe {
+            let class_name = to_wide(METER_CLASS_NAME);
+            let meter = CreateWindowExW(
+                WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_NOPARENTNOTIFY,
+                class_name.as_ptr(),
+                std::ptr::null(),
+                WS_CHILD,
+                0,
+                0,
+                1,
+                1,
+                taskbar,
+                std::ptr::null_mut(),
+                GetModuleHandleW(std::ptr::null()),
+                std::ptr::null(),
+            );
+            if meter.is_null() {
+                return false;
+            }
+            DestroyWindow(self.meter);
+            self.meter = meter;
+        }
+        self.taskbar = taskbar;
+        self.is_shown = false;
+        self.is_tracking_mouse = false;
+        true
+    }
+
+    /// Moves the meter onto the taskbar and hides it when it must not show.
     fn sync_position(&mut self) {
         let Some(info) = find_taskbar() else {
             self.set_shown(false);
             return;
         };
-        // SAFETY: GetDpiForWindow returns 0 for a stale window, handled just below.
-        let dpi = unsafe { GetDpiForWindow(info.taskbar) };
-        if dpi != 0 && dpi != self.readout.dpi() {
-            self.readout = Readout::new(self.window, dpi, &self.settings.borrow());
+        // SAFETY: IsWindow accepts any handle. GetDpiForWindow returns 0 for a stale window, handled below.
+        let (is_docked, taskbar_dpi) =
+            unsafe { (self.taskbar == info.taskbar && IsWindow(self.meter) != 0, GetDpiForWindow(info.taskbar)) };
+        if !is_docked && !self.dock_meter(info.taskbar) {
+            return;
+        }
+        let dpi = if taskbar_dpi == 0 { self.readout.dpi() } else { taskbar_dpi };
+        if !is_docked || dpi != self.readout.dpi() {
+            self.readout = Readout::new(self.meter, dpi, &self.settings.borrow());
             self.readout.draw(&self.up_text, &self.down_text, &self.colors);
+            self.position = (i32::MIN, i32::MIN);
         }
         let (width, height) = (self.readout.width, self.readout.height);
         if is_taskbar_collapsed(&info.taskbar_rect, width, height) || is_fullscreen_active() {
@@ -184,18 +226,23 @@ impl App {
         } else {
             SWP_NOSIZE | SWP_NOACTIVATE
         };
+        let inside = to_taskbar_coords(position, &info.taskbar_rect);
+        if position != self.position {
+            // SAFETY: self.window is valid until the app exits. It stays hidden; popups read its screen area.
+            unsafe { SetWindowPos(self.window, std::ptr::null_mut(), position.0, position.1, width, height, SWP_NOZORDER | SWP_NOACTIVATE) };
+        }
         self.position = position;
-        // SAFETY: self.window is valid until the app exits.
-        unsafe { SetWindowPos(self.window, HWND_TOPMOST, position.0, position.1, 0, 0, flags) };
+        // SAFETY: self.meter was checked above; a meter that has just died only makes this call fail.
+        unsafe { SetWindowPos(self.meter, HWND_TOP, inside.0, inside.1, 0, 0, flags) };
         self.set_shown(true);
     }
 
-    /// Shows or hides the window only when that actually changes.
+    /// Shows or hides the meter only when that actually changes.
     fn set_shown(&mut self, shown: bool) {
         if shown != self.is_shown {
             self.is_shown = shown;
-            // SAFETY: self.window is valid until the app exits.
-            unsafe { ShowWindow(self.window, if shown { SW_SHOWNOACTIVATE } else { SW_HIDE }) };
+            // SAFETY: ShowWindow only fails on a meter that has died, and sync_position replaces those.
+            unsafe { ShowWindow(self.meter, if shown { SW_SHOWNOACTIVATE } else { SW_HIDE }) };
         }
     }
 
@@ -282,7 +329,7 @@ impl App {
         self.format = settings.speed_format();
         self.mode = settings.interface_mode();
         self.usage.borrow_mut().keep_days = settings.keep_days();
-        self.readout = Readout::new(self.window, self.readout.dpi(), &settings);
+        self.readout = Readout::new(self.meter, self.readout.dpi(), &settings);
         self.colors = readout_colors(&settings, self.taskbar_text, self.up_speed, self.down_speed);
         self.up_text = format_speed(self.up_speed, &self.format);
         self.down_text = format_speed(self.down_speed, &self.format);
@@ -303,7 +350,7 @@ impl App {
         let mut request = TRACKMOUSEEVENT {
             cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
             dwFlags: TME_HOVER | TME_LEAVE,
-            hwndTrack: self.window,
+            hwndTrack: self.meter,
             dwHoverTime: HOVER_DELAY_MS,
         };
         // SAFETY: `request` is valid for the duration of the call.
@@ -400,7 +447,18 @@ unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM
     0
 }
 
-/// Asks for a re-sync when another window comes to the front, since the taskbar may now cover the readout.
+/// Hands the meter's mouse messages to the main window, which owns the popups they open.
+unsafe extern "system" fn meter_proc(meter: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match message {
+        WM_RBUTTONUP | WM_LBUTTONUP | WM_MOUSEMOVE | WM_MOUSEHOVER | WM_MOUSELEAVE => {
+            let window = WINDOW.with(|cell| *cell.borrow());
+            window_proc(window, message, wparam, lparam)
+        }
+        _ => DefWindowProcW(meter, message, wparam, lparam),
+    }
+}
+
+/// Asks for a re-sync when another window comes to the front, since a fullscreen app may now be showing.
 unsafe extern "system" fn on_foreground_change(
     _hook: HWINEVENTHOOK,
     _event: u32,
@@ -442,8 +500,10 @@ fn main() {
             lpszClassName: class_name.as_ptr(),
         };
         RegisterClassW(&class);
+        let meter_class_name = to_wide(METER_CLASS_NAME);
+        RegisterClassW(&WNDCLASSW { lpfnWndProc: Some(meter_proc), hIcon: std::ptr::null_mut(), lpszClassName: meter_class_name.as_ptr(), ..class });
         let window = CreateWindowExW(
-            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             class_name.as_ptr(),
             title.as_ptr(),
             WS_POPUP,
@@ -485,6 +545,8 @@ fn main() {
         let timer_ms = settings.update_milliseconds();
         let mut app = App {
             window,
+            meter: std::ptr::null_mut(),
+            taskbar: std::ptr::null_mut(),
             readout: Readout::new(window, dpi, &settings),
             tracker,
             counters,
@@ -506,7 +568,6 @@ fn main() {
             idle_ticks: 0,
             timer_ms,
         };
-        app.readout.draw(&app.up_text, &app.down_text, &app.colors);
         app.sync_position();
         APP.with(|cell| *cell.borrow_mut() = Some(app));
 

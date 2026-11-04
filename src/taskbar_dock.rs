@@ -66,6 +66,11 @@ pub fn place_readout(taskbar: &RECT, tray: &RECT, width: i32, height: i32, scale
     }
 }
 
+/// Converts a screen position to one inside the taskbar, which is how a child window is placed.
+pub fn to_taskbar_coords(position: (i32, i32), taskbar: &RECT) -> (i32, i32) {
+    (position.0 - taskbar.left, position.1 - taskbar.top)
+}
+
 /// Returns true when a collapsed auto-hide taskbar is too thin to hold the readout.
 pub fn is_taskbar_collapsed(taskbar: &RECT, readout_width: i32, readout_height: i32) -> bool {
     let width = taskbar.right - taskbar.left;
