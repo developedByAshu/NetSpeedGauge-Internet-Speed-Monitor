@@ -3,14 +3,15 @@
 use crate::calendar::today;
 use crate::canvas::{create_font, mix, Align, Canvas};
 use crate::format::format_bytes;
-use crate::messages::{WM_APP_EXIT, WM_APP_OPEN_SETTINGS, WM_APP_OPEN_USAGE};
-use crate::taskbar_dock::to_wide;
+use crate::messages::{WM_APP_EXIT, WM_APP_OPEN_SETTINGS, WM_APP_OPEN_USAGE, WM_APP_POPUP_CHANGED};
+use crate::taskbar_dock::{find_taskbar, to_wide};
 use crate::theme::{apply_popup_frame, current_theme, figure_colors, Theme};
 use crate::usage_store::{Period, UsageStore};
 use std::cell::RefCell;
+use std::time::Instant;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
-    BeginPaint, DeleteObject, EndPaint, InvalidateRect, HFONT, PAINTSTRUCT,
+    BeginPaint, DeleteObject, EndPaint, InvalidateRect, UpdateWindow, HFONT, PAINTSTRUCT,
 };
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, SetProcessWorkingSetSize};
@@ -19,10 +20,11 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SetFocus, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, VK_DOWN, VK_ESCAPE, VK_RETURN, VK_UP,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowRect, LoadCursorW, PostMessageW,
-    RegisterClassW, SetCursor, SetForegroundWindow, ShowWindow, CS_DROPSHADOW, HTCLIENT, IDC_ARROW,
-    IDC_HAND, SW_SHOW, SW_SHOWNOACTIVATE, WM_ACTIVATE, WM_DESTROY, WM_ERASEBKGND, WM_KEYDOWN,
-    WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_SETCURSOR, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowRect, KillTimer, LoadCursorW, PostMessageW,
+    RegisterClassW, SetCursor, SetForegroundWindow, SetTimer, SetWindowPos, ShowWindow, SystemParametersInfoW,
+    CS_DROPSHADOW, HTCLIENT, IDC_ARROW, IDC_HAND, SPI_GETCLIENTAREAANIMATION, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_NOZORDER, SW_SHOW, SW_SHOWNOACTIVATE, WM_ACTIVATE, WM_DESTROY, WM_ERASEBKGND, WM_KEYDOWN,
+    WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WM_SETCURSOR, WM_TIMER, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     WS_EX_TOPMOST, WS_POPUP,
 };
 
@@ -42,6 +44,12 @@ const GAP_ABOVE_TASKBAR: i32 = 10;
 const ACTIVE_NONE: u32 = 0;
 const ARROW_UP: &str = "\u{2191}";
 const ARROW_DOWN: &str = "\u{2193}";
+
+// Windows' own panels slide from behind the taskbar: measured 158 to 247 ms up and 142 to 197 ms down on Windows 11.
+const SLIDE_IN_MS: f32 = 180.0;
+const SLIDE_OUT_MS: f32 = 160.0;
+const SLIDE_TIMER: usize = 1;
+const SLIDE_STEP_MS: u32 = 10;
 
 /// One thing the menu can do, with its icon, label and the message it sends.
 const MENU_ITEMS: [(&str, &str, u32); 3] = [
@@ -84,6 +92,40 @@ impl Drop for PopupFonts {
     }
 }
 
+/// How far a popup still is from its place while opening: 1 is fully down, 0 is in place. It slows as it arrives.
+pub fn slide_in_offset(elapsed_ms: f32) -> f32 {
+    (1.0 - (elapsed_ms / SLIDE_IN_MS).clamp(0.0, 1.0)).powi(3)
+}
+
+/// How far a popup has gone while closing, from where it started: 0 is not moved, 1 is fully down. It speeds up as it leaves.
+pub fn slide_out_offset(elapsed_ms: f32) -> f32 {
+    (elapsed_ms / SLIDE_OUT_MS).clamp(0.0, 1.0).powi(2)
+}
+
+/// Returns false when the user has turned off animation effects in Windows.
+fn animations_enabled() -> bool {
+    let mut enabled = 1i32;
+    // SAFETY: `enabled` outlives the call and is the size this query writes.
+    unsafe { SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, std::ptr::from_mut(&mut enabled).cast(), 0) };
+    enabled != 0
+}
+
+/// Puts the popup just under the taskbar in the stacking order, so it slides out from behind it.
+fn place_behind_taskbar(window: HWND) {
+    if let Some(info) = find_taskbar() {
+        // SAFETY: both handles are valid here. On failure the popup only slides over the taskbar instead.
+        unsafe { SetWindowPos(window, info.taskbar, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) };
+    }
+}
+
+/// Whether a popup is sliding, and which way.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Motion {
+    Opening,
+    Resting,
+    Closing,
+}
+
 /// Today's and this month's totals, read once when the popup opens.
 #[derive(Clone, Copy)]
 struct Totals {
@@ -120,6 +162,14 @@ struct Popup {
     is_pinned: bool,
     hover_row: Option<usize>,
     is_tracking_mouse: bool,
+    x: i32,
+    resting_y: i32,
+    // How far below its place the popup is at offset 1. Zero when animation effects are off.
+    slide_distance: i32,
+    motion: Motion,
+    motion_started: Instant,
+    offset: f32,
+    closing_from: f32,
 }
 
 thread_local! {
@@ -216,6 +266,53 @@ impl Popup {
         }
         let divider_y = self.row_top(EXIT_ROW) - self.px(DIVIDER_HEIGHT / 2 + 1);
         self.canvas.round_rect(divider_x, divider_y, divider_width, self.px(1).max(1), 0.0, theme.border);
+    }
+
+    fn place_at(&mut self, offset: f32) {
+        self.offset = offset;
+        let y = self.resting_y + (self.slide_distance as f32 * offset).round() as i32;
+        // SAFETY: the window is valid while this state exists.
+        unsafe { SetWindowPos(self.window, std::ptr::null_mut(), self.x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) };
+    }
+
+    /// Moves one step along the slide. Returns true when a closing popup has finished and can go.
+    fn advance_slide(&mut self) -> bool {
+        let elapsed = self.motion_started.elapsed().as_secs_f32() * 1000.0;
+        match self.motion {
+            Motion::Opening => {
+                self.place_at(slide_in_offset(elapsed));
+                if elapsed >= SLIDE_IN_MS {
+                    self.motion = Motion::Resting;
+                    // SAFETY: the window is valid while this state exists.
+                    unsafe { KillTimer(self.window, SLIDE_TIMER) };
+                }
+                false
+            }
+            Motion::Closing => {
+                self.place_at(self.closing_from + (1.0 - self.closing_from) * slide_out_offset(elapsed));
+                elapsed >= SLIDE_OUT_MS
+            }
+            Motion::Resting => false,
+        }
+    }
+
+    /// Starts sliding away from wherever it is now. Returns true when it should simply go at once.
+    fn begin_close(&mut self) -> bool {
+        if self.motion == Motion::Closing {
+            return false;
+        }
+        if self.slide_distance == 0 {
+            return true;
+        }
+        self.closing_from = self.offset;
+        self.motion = Motion::Closing;
+        self.motion_started = Instant::now();
+        // SAFETY: both windows are valid here. Setting a running timer again only restarts it.
+        unsafe {
+            SetTimer(self.window, SLIDE_TIMER, SLIDE_STEP_MS, None);
+            PostMessageW(self.anchor, WM_APP_POPUP_CHANGED, 0, 0);
+        }
+        false
     }
 
     fn invalidate(&self) {
@@ -326,13 +423,28 @@ unsafe extern "system" fn popup_proc(window: HWND, message: u32, wparam: WPARAM,
             0
         }
         WM_APP_CLOSE_POPUP => {
-            DestroyWindow(window);
+            let mut goes_now = false;
+            with_popup(|popup| goes_now = popup.begin_close());
+            if goes_now {
+                DestroyWindow(window);
+            }
+            0
+        }
+        WM_TIMER => {
+            let mut has_finished = false;
+            with_popup(|popup| has_finished = popup.advance_slide());
+            // Destroyed only after the state is released, because WM_DESTROY needs it.
+            if has_finished {
+                DestroyWindow(window);
+            }
             0
         }
         WM_DESTROY => {
             OPEN_POPUP.with(|cell| {
                 if let Ok(mut state) = cell.try_borrow_mut() {
-                    state.take();
+                    if let Some(popup) = state.take() {
+                        PostMessageW(popup.anchor, WM_APP_POPUP_CHANGED, 0, 0);
+                    }
                 }
             });
             SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
@@ -375,7 +487,9 @@ fn open(store: &UsageStore, anchor: HWND, is_menu: bool, is_pinned: bool) {
         let mut anchor_area = RECT { left: 0, top: 0, right: 0, bottom: 0 };
         GetWindowRect(anchor, &mut anchor_area);
         let x = anchor_area.right - width;
-        let y = anchor_area.top - height - scale(GAP_ABOVE_TASKBAR);
+        let resting_y = anchor_area.top - height - scale(GAP_ABOVE_TASKBAR);
+        // It starts with its top edge inside the taskbar, so nothing shows until it slides up.
+        let slide_distance = if animations_enabled() { anchor_area.top - resting_y } else { 0 };
         // Only a popup that takes focus can tell when the user clicks somewhere else.
         let takes_focus = is_menu || is_pinned;
         let extra_style = if takes_focus { 0 } else { WS_EX_NOACTIVATE };
@@ -385,7 +499,7 @@ fn open(store: &UsageStore, anchor: HWND, is_menu: bool, is_pinned: bool) {
             title.as_ptr(),
             WS_POPUP,
             x,
-            y,
+            resting_y + slide_distance,
             width,
             height,
             std::ptr::null_mut(),
@@ -408,15 +522,32 @@ fn open(store: &UsageStore, anchor: HWND, is_menu: bool, is_pinned: bool) {
             is_pinned,
             hover_row: None,
             is_tracking_mouse: false,
+            x,
+            resting_y,
+            slide_distance,
+            motion: if slide_distance == 0 { Motion::Resting } else { Motion::Opening },
+            motion_started: Instant::now(),
+            offset: 1.0,
+            closing_from: 0.0,
         };
         OPEN_POPUP.with(|cell| *cell.borrow_mut() = Some(popup));
+        place_behind_taskbar(window);
         if takes_focus {
             ShowWindow(window, SW_SHOW);
+            UpdateWindow(window);
             SetForegroundWindow(window);
             SetFocus(window);
+            // Taking focus lifts it above the taskbar, so it goes back underneath.
+            place_behind_taskbar(window);
         } else {
             ShowWindow(window, SW_SHOWNOACTIVATE);
+            UpdateWindow(window);
         }
+        with_popup(|popup| popup.motion_started = Instant::now());
+        if slide_distance != 0 {
+            SetTimer(window, SLIDE_TIMER, SLIDE_STEP_MS, None);
+        }
+        PostMessageW(anchor, WM_APP_POPUP_CHANGED, 0, 0);
     }
 }
 
@@ -432,9 +563,7 @@ pub fn show_pinned_card(store: &UsageStore, anchor: HWND) {
 
 /// Opens the hover card with today's and this month's totals, unless a menu is showing.
 pub fn show_hover_card(store: &UsageStore, anchor: HWND) {
-    let mut is_open = false;
-    with_popup(|_| is_open = true);
-    if !is_open {
+    if !is_open() {
         open(store, anchor, false, false);
     }
 }
@@ -442,15 +571,30 @@ pub fn show_hover_card(store: &UsageStore, anchor: HWND) {
 /// Returns true while a card opened by a click is showing, so the next click can close it.
 pub fn is_pinned_card_open() -> bool {
     let mut is_open = false;
-    with_popup(|popup| is_open = popup.is_pinned);
+    with_popup(|popup| is_open = popup.is_pinned && popup.motion != Motion::Closing);
     is_open
 }
 
-/// Returns true while any popup is showing.
+/// Returns true while any popup is showing and not on its way out.
 pub fn is_open() -> bool {
     let mut is_open = false;
-    with_popup(|_| is_open = true);
+    with_popup(|popup| is_open = popup.motion != Motion::Closing);
     is_open
+}
+
+/// Returns true while the numbers should look selected: their menu or clicked card is open, not a passing hover card.
+pub fn is_selected() -> bool {
+    let mut is_selected = false;
+    with_popup(|popup| is_selected = (popup.is_menu || popup.is_pinned) && popup.motion != Motion::Closing);
+    is_selected
+}
+
+/// Slides whichever popup is open away. The window is destroyed when the slide ends.
+pub fn request_close() {
+    with_popup(|popup| {
+        // SAFETY: the window is valid while this state exists.
+        unsafe { PostMessageW(popup.window, WM_APP_CLOSE_POPUP, 0, 0) };
+    });
 }
 
 /// Closes the hover card when the mouse leaves, leaving a menu or a pinned card open.

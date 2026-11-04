@@ -9,7 +9,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 // Space kept between the readout and the tray, at 100% scaling.
-const TRAY_GAP: i32 = 4;
+pub const TRAY_GAP: i32 = 4;
 
 // The desktop background fills the monitor too, but must not count as a fullscreen app.
 const DESKTOP_WINDOW_CLASSES: [&str; 2] = ["Progman", "WorkerW"];
