@@ -1,0 +1,41 @@
+[package]
+name = "netspeedgauge-windows"
+version.workspace = true
+edition.workspace = true
+description = "Tiny internet speed monitor for the Windows taskbar"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "netspeedgauge_windows"
+path = "src/lib.rs"
+
+[[bin]]
+name = "NetSpeedGauge"
+path = "src/main.rs"
+
+[build-dependencies]
+embed-resource = "3"
+
+[dependencies]
+netspeedgauge-shared = { path = "../shared" }
+
+[dependencies.windows-sys]
+version = "0.61"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Security",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_Accessibility",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_Ime",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+]

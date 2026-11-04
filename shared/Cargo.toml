@@ -1,0 +1,11 @@
+[package]
+name = "netspeedgauge-shared"
+version.workspace = true
+edition.workspace = true
+description = "The logic every NetSpeedGauge app shares"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "netspeedgauge_shared"
+path = "src/lib.rs"

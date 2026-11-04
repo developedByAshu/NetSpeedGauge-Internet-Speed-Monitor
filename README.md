@@ -157,8 +157,8 @@ It shows on the main taskbar only.
 You need Rust and the Visual Studio C++ build tools.
 
 ```
-cargo test --release
-cargo build --release
+cargo test --release -p netspeedgauge-shared -p netspeedgauge-windows
+cargo build --release -p netspeedgauge-windows --bin NetSpeedGauge
 ```
 
 The program ends up in `target\release\NetSpeedGauge.exe`.

@@ -19,13 +19,13 @@ jobs:
         run: rustup target add aarch64-pc-windows-msvc
 
       - name: Run the tests
-        run: cargo test --release
+        run: cargo test --release -p netspeedgauge-shared -p netspeedgauge-windows
 
       - name: Build for x64
-        run: cargo build --release --bin NetSpeedGauge
+        run: cargo build --release -p netspeedgauge-windows --bin NetSpeedGauge
 
       - name: Build for ARM64
-        run: cargo build --release --bin NetSpeedGauge --target aarch64-pc-windows-msvc
+        run: cargo build --release -p netspeedgauge-windows --bin NetSpeedGauge --target aarch64-pc-windows-msvc
 
       - name: Collect the programs and their checksums
         shell: pwsh
