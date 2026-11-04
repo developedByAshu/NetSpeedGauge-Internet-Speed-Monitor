@@ -636,14 +636,14 @@ impl SettingsWindow {
         let (height, top) = (self.px(32), y + self.px(9));
         let mut x = right - total;
         let radius = self.px(CARD_RADIUS) as f32;
-        self.canvas.round_rect(x, top, total, height, radius, mix(theme.card, theme.background, 0.7));
+        self.canvas.round_rect(x, top, total, height, radius, theme.segment_track_on_card);
         let inset = self.px(3);
         for (position, option) in options.iter().enumerate() {
             let segment = widths[position];
             let action = Action::Set(field, position as i64);
             let is_selected = value == position as i64;
             if is_selected {
-                self.canvas.round_rect(x + inset, top + inset, segment - inset * 2, height - inset * 2, radius - inset as f32 / 2.0, theme.selected);
+                self.canvas.round_rect(x + inset, top + inset, segment - inset * 2, height - inset * 2, radius - inset as f32 / 2.0, theme.segment_selected);
             }
             let color = if is_selected || self.is_hover(action) { theme.text } else { theme.muted };
             let font = if is_selected { self.fonts.strong } else { self.fonts.body };

@@ -331,7 +331,7 @@ impl UsageWindow {
         let first = self.period_area(0);
         let radius = self.px(CONTROL_RADIUS as i32) as f32;
         let track_width = first.width * PERIODS.len() as i32;
-        self.canvas.round_rect(first.x, first.y, track_width, first.height, radius, theme.control);
+        self.canvas.round_rect(first.x, first.y, track_width, first.height, radius, theme.segment_track_on_page);
         let inset = self.px(3);
         for (position, (period, label)) in PERIODS.iter().enumerate() {
             let area = self.period_area(position);
@@ -344,7 +344,7 @@ impl UsageWindow {
                     area.width - inset * 2,
                     area.height - inset * 2,
                     radius - inset as f32 / 2.0,
-                    theme.selected,
+                    theme.segment_selected,
                 );
             }
             let color = if is_selected || is_hover { theme.text } else { theme.muted };
