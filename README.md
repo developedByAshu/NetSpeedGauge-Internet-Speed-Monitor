@@ -126,14 +126,14 @@ On Windows it shows on the main taskbar only.
 <table>
   <tr><th></th><th>Windows</th><th>Mac</th></tr>
   <tr><td>Tested on</td><td>Ryzen 5800H, 16GB</td><td>M4, 16GB</td></tr>
-  <tr><td>CPU, average</td><td>0.19% of one core (0.01% of the processor)</td><td>0.37% of one core (0.04% of the processor)</td></tr>
-  <tr><td>CPU, highest 15 seconds</td><td>0.52% of one core</td><td>0.86% of one core</td></tr>
+  <tr><td>CPU, average</td><td>0.19% of one core (0.01% of the processor)</td><td>0.30% of one core (0.03% of the processor)</td></tr>
+  <tr><td>CPU, highest 15 seconds</td><td>0.52% of one core</td><td>0.66% of one core</td></tr>
   <tr><td>RAM, average</td><td>3.0 MB (working set)</td><td>14 MB (physical footprint)</td></tr>
   <tr><td>RAM with a window open</td><td>4.2 MB with Usage, 7.2 MB with Settings</td><td>Up to 92 MB, about 32 MB after closing</td></tr>
   <tr><td>RAM after closing the window</td><td>1.5 MB</td><td>About 32 MB</td></tr>
 </table>
 
-<sub>10 minutes each, plugged in, updating every second with Slow down when idle on, and light traffic (under 10 MB on each). The two RAM tools measure differently, so the RAM figures are not a direct comparison. Window figures are readings, not averages. Heavy traffic has not been measured. Yours may differ.</sub>
+<sub>10 minutes each, plugged in, updating every second with Slow down when idle on, and light traffic (under 10 MB on Windows, 25 MB on Mac). The two RAM tools measure differently, so the RAM figures are not a direct comparison. Window figures are readings, not averages. Heavy traffic has not been measured. Yours may differ.</sub>
 
 ## Common questions
 

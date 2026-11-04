@@ -6,7 +6,7 @@ use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol, ProtocolObject};
 use objc2::{define_class, msg_send, sel, AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSAppearanceCustomization, NSApplication, NSApplicationDelegate, NSBackingStoreType, NSBitmapImageFileType, NSCursor, NSEvent, NSEventModifierFlags, NSEventType,
-    NSMenu, NSMenuItem, NSPanel, NSTrackingArea, NSTrackingAreaOptions, NSView, NSWindow, NSWindowButton, NSWindowCollectionBehavior,
+    NSMenu, NSMenuDelegate, NSMenuItem, NSPanel, NSTrackingArea, NSTrackingAreaOptions, NSView, NSWindow, NSWindowButton, NSWindowCollectionBehavior,
     NSWindowDelegate, NSWindowStyleMask,
 };
 use objc2_foundation::{NSDictionary, NSNotification, NSPoint, NSRect, NSSize, NSString, NSTimer};
@@ -16,6 +16,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub const WINDOW_LEVEL_NORMAL: isize = 0;
 pub const WINDOW_LEVEL_FLOATING: isize = 3;
 pub const WINDOW_LEVEL_POPUP: isize = 25;
+
+const PENDING_COMMAND_DELAY_SECONDS: f64 = 0.01;
 
 pub const KEY_RETURN: u16 = 36;
 pub const KEY_ESCAPE: u16 = 53;
@@ -76,6 +78,17 @@ define_class!(
         #[unsafe(method(isFlipped))]
         fn is_flipped(&self) -> bool {
             true
+        }
+
+        #[unsafe(method(viewWillDraw))]
+        fn view_will_draw(&self) {
+            if self.ivars().surface == Surface::Popup {
+                if let Some(window) = self.window() {
+                    popup_ui::on_will_draw_in(&window);
+                }
+            }
+            // SAFETY: this calls NSView's own method.
+            let _: () = unsafe { msg_send![super(self), viewWillDraw] };
         }
 
         #[unsafe(method(acceptsFirstResponder))]
@@ -261,15 +274,30 @@ define_class!(
         }
     }
 
+    unsafe impl NSMenuDelegate for AppDelegate {
+        #[unsafe(method(menuNeedsUpdate:))]
+        fn menu_needs_update(&self, _menu: &NSMenu) {
+            app::on_system_menu_opening();
+        }
+
+        #[unsafe(method(menuDidClose:))]
+        fn menu_did_close(&self, _menu: &NSMenu) {
+            popup_ui::on_system_menu_closed();
+        }
+    }
+
     impl AppDelegate {
+        #[unsafe(method(pendingCommand:))]
+        fn pending_command(&self, _timer: &NSTimer) {
+            popup_ui::run_pending_command();
+            app::flush_commands();
+        }
+
         #[unsafe(method(readoutClicked:))]
         fn readout_clicked(&self, _sender: Option<&AnyObject>) {
-            let event = NSApplication::sharedApplication(main_thread()).currentEvent();
-            let is_menu_click = event.is_some_and(|event| {
-                event.r#type() == NSEventType::RightMouseUp || event.modifierFlags().contains(NSEventModifierFlags::Control)
-            });
+            let is_menu_click = current_event_asks_for_menu();
             if is_menu_click {
-                app::on_readout_right_click();
+                app::open_item_menu();
             } else {
                 app::on_readout_click();
             }
@@ -299,6 +327,19 @@ define_class!(
         }
     }
 );
+
+/// Returns true when the event being handled is a right click or a Control click.
+pub fn current_event_asks_for_menu() -> bool {
+    let event = NSApplication::sharedApplication(main_thread()).currentEvent();
+    event.is_some_and(|event| {
+        matches!(event.r#type(), NSEventType::RightMouseDown | NSEventType::RightMouseUp) || event.modifierFlags().contains(NSEventModifierFlags::Control)
+    })
+}
+
+/// Runs what a menu row asked for just after the menu's own closing has finished.
+pub fn run_pending_command_soon() {
+    start_timer(PENDING_COMMAND_DELAY_SECONDS, sel!(pendingCommand:), false);
+}
 
 fn window_of(notification: &NSNotification) -> Option<Retained<NSWindow>> {
     notification.object()?.downcast::<NSWindow>().ok()
@@ -397,6 +438,8 @@ pub fn show_with_focus(window: &NSWindow, view: &GaugeView) {
     // SAFETY: the selector exists on every macOS version. This older call works without macOS 14's replacement.
     let _: () = unsafe { msg_send![&*application, activateIgnoringOtherApps: true] };
     window.makeKeyAndOrderFront(None);
+    // macOS can refuse the activation above, and a window asked to come forward then stays hidden.
+    window.orderFrontRegardless();
     window.makeFirstResponder(Some(view));
 }
 

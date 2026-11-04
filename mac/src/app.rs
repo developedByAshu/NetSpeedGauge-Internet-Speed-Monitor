@@ -128,6 +128,16 @@ fn record_usage(usage: &mut UsageStore, luid: u64, up: u64, down: u64) {
 }
 
 impl App {
+    /// Keeps the Mac's own menu on the item while a left click shows the card. It then handles both clicks
+    /// itself, because opening it from a click leaves the button waiting and the next click gets lost.
+    fn sync_item_menu(&self) {
+        if let Some(item) = &self.status_item {
+            let shows_card = self.settings.borrow().meter_action(Field::ClickAction) == MeterAction::Card;
+            let menu = shows_card.then(popup_ui::system_menu);
+            item.setMenu(menu.as_deref());
+        }
+    }
+
     fn create(with_menu_bar_item: bool) -> Self {
         let settings = Settings::load();
         set_theme_choice(settings.get(Field::WindowTheme));
@@ -281,6 +291,8 @@ impl App {
         set_theme_choice(settings.get(Field::WindowTheme));
         set_icon_colors(settings.get(Field::UpColor), settings.get(Field::DownColor));
         usage_ui::apply_theme();
+        popup_ui::sync_system_menu_look();
+        self.sync_item_menu();
     }
 }
 
@@ -429,6 +441,34 @@ pub fn on_readout_click() {
     }
 }
 
+/// Builds what the Mac's own menu shows, just before it opens. Nothing stays borrowed while it is open.
+pub fn on_system_menu_opening() {
+    with_app(|app| {
+        if let Some(timer) = app.hover_timer.take() {
+            timer.invalidate();
+        }
+    });
+    if let Some((usage, _)) = shared_state() {
+        popup_ui::fill_system_menu(&usage.borrow(), surface::current_event_asks_for_menu());
+    }
+}
+
+/// Opens the Mac's own menu for a right click when a left click does something else.
+pub fn open_item_menu() {
+    let mut item = None;
+    with_app(|app| item = app.status_item.clone());
+    let Some(item) = item else {
+        return;
+    };
+    let Some(button) = item.button(main_thread()) else {
+        return;
+    };
+    item.setMenu(Some(&popup_ui::system_menu()));
+    // SAFETY: a nil sender is allowed, and the button stays alive through the call.
+    unsafe { button.performClick(None) };
+    item.setMenu(None);
+}
+
 /// Opens the menu.
 pub fn on_readout_right_click() {
     if let Some((usage, _)) = shared_state() {
@@ -441,6 +481,7 @@ pub fn on_appearance_change() {
     with_app(|app| app.redraw());
     usage_ui::apply_theme();
     settings_ui::apply_theme();
+    popup_ui::sync_system_menu_look();
 }
 
 /// Runs one timer tick.
@@ -493,6 +534,8 @@ pub fn finish_startup() {
     let app = App::create(true);
     APP.with(|cell| *cell.borrow_mut() = Some(app));
     with_app(|app| {
+        popup_ui::sync_system_menu_look();
+        app.sync_item_menu();
         app.start_timer();
         app.redraw();
     });
@@ -520,6 +563,10 @@ pub fn sync_dock_entry() {
     application.setActivationPolicy(wanted);
     if wanted == NSApplicationActivationPolicy::Accessory {
         application.deactivate();
+    } else {
+        // Changing to having a Dock entry drops the focus the new window has just asked for.
+        // SAFETY: the selector exists on every macOS version.
+        let _: () = unsafe { objc2::msg_send![&*application, activateIgnoringOtherApps: true] };
     }
 }
 
