@@ -1,6 +1,6 @@
 name: Release
 
-# Builds and publishes both Windows programs when a version tag such as v1.0.0 is pushed.
+# Builds and publishes the Windows and Mac programs when a version tag such as v1.0.0 is pushed.
 on:
   push:
     tags:
@@ -10,10 +10,37 @@ permissions:
   contents: write
 
 jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the tests
+        run: |
+          cargo test --release -p netspeedgauge-shared
+          cargo test --release -p netspeedgauge-mac --test readout_tests
+
+      - name: Build the app
+        run: SKIP_TESTS=1 ./mac/bundle.sh
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent target/mac/NetSpeedGauge.app NetSpeedGauge-mac-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-program
+          path: NetSpeedGauge-mac-arm64.zip
+
   release:
+    needs: mac
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-program
+          path: dist
 
       - name: Add the ARM target
         run: rustup target add aarch64-pc-windows-msvc
@@ -30,10 +57,9 @@ jobs:
       - name: Collect the programs and their checksums
         shell: pwsh
         run: |
-          New-Item -ItemType Directory dist | Out-Null
           Copy-Item target\release\NetSpeedGauge.exe dist\NetSpeedGauge-x64.exe
           Copy-Item target\aarch64-pc-windows-msvc\release\NetSpeedGauge.exe dist\NetSpeedGauge-arm64.exe
-          Get-ChildItem dist -Filter *.exe | ForEach-Object {
+          Get-ChildItem dist | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           } | Set-Content dist\SHA256SUMS.txt
 
@@ -42,5 +68,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME dist\NetSpeedGauge-x64.exe dist\NetSpeedGauge-arm64.exe dist\SHA256SUMS.txt `
+          gh release create $env:GITHUB_REF_NAME dist\NetSpeedGauge-x64.exe dist\NetSpeedGauge-arm64.exe dist\NetSpeedGauge-mac-arm64.zip dist\SHA256SUMS.txt `
             --title "NetSpeedGauge $env:GITHUB_REF_NAME" --notes-file docs\release-notes\$env:GITHUB_REF_NAME.md

@@ -19,7 +19,7 @@ pub const PALETTE: [u32; 10] = [
 #[cfg(not(target_os = "macos"))]
 pub const FONT_FAMILIES: [&str; 4] = ["Segoe UI", "Segoe UI Semibold", "Bahnschrift", "Consolas"];
 #[cfg(target_os = "macos")]
-pub const FONT_FAMILIES: [&str; 4] = ["Helvetica Neue", "Avenir Next", "Menlo", "Monaco"];
+pub const FONT_FAMILIES: [&str; 4] = ["System", "Menlo", "SF Mono", "Helvetica Neue"];
 
 /// The shapes offered for the upload and download markers, as (up, down).
 pub const ARROW_STYLES: [(&str, &str); 3] = [("\u{2191}", "\u{2193}"), ("\u{25B2}", "\u{25BC}"), ("U", "D")];
@@ -83,8 +83,8 @@ pub enum MeterAction {
     UsageWindow,
 }
 
-// Older versions saved these as on or off. On matches today's defaults, so only off carries over.
-const OLD_ON_OFF_KEYS: [(&str, Field); 2] = [("hover_card", Field::HoverAction), ("click_opens_usage", Field::ClickAction)];
+// Older versions saved these as on or off, and on meant the choice given here.
+const OLD_ON_OFF_KEYS: [(&str, Field, i64); 2] = [("hover_card", Field::HoverAction, 1), ("click_opens_usage", Field::ClickAction, 2)];
 
 /// A choice's name in the file, starting value and limits.
 pub struct FieldSpec {
@@ -128,10 +128,10 @@ pub const FIELDS: [FieldSpec; 32] = [
     spec(Field::OffsetY, "offset_y", 0, -20, 20),
     spec(Field::InterfaceMode, "interface_mode", 0, 0, 2),
     spec(Field::KeepHistory, "keep_history", 3, 0, 3),
-    spec(Field::HoverAction, "hover_action", 1, 0, 2),
+    spec(Field::HoverAction, "hover_action", 0, 0, 2),
     spec(Field::KeepOnTop, "keep_on_top", 0, 0, 1),
     spec(Field::WindowTheme, "window_theme", 0, 0, 2),
-    spec(Field::ClickAction, "click_action", 2, 0, 2),
+    spec(Field::ClickAction, "click_action", 1, 0, 2),
     spec(Field::ShowIcons, "show_icons", 1, 0, 1),
     spec(Field::ShowBackground, "show_background", 0, 0, 1),
 ];
@@ -282,10 +282,8 @@ impl Settings {
             };
             if key == CHOSEN_ADAPTERS_KEY {
                 settings.chosen_adapters = value.split(',').filter_map(|luid| luid.parse().ok()).collect();
-            } else if let Some((_, field)) = OLD_ON_OFF_KEYS.iter().find(|(old_key, _)| *old_key == key) {
-                if value.trim() == "0" {
-                    settings.set(*field, 0);
-                }
+            } else if let Some((_, field, on_choice)) = OLD_ON_OFF_KEYS.iter().find(|(old_key, _, _)| *old_key == key) {
+                settings.set(*field, if value.trim() == "0" { 0 } else { *on_choice });
             } else if key == "arrow_style" && value.trim() == OLD_NO_ICONS_STYLE {
                 settings.set(Field::ShowIcons, 0);
             } else if key == "background_color" && value.trim().starts_with(OLD_NO_BACKGROUND_SIGN) {

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["shared", "windows"]
+members = ["shared", "windows", "mac"]
 
 [workspace.package]
 version = "1.0.1"
