@@ -148,7 +148,7 @@ fn readout_colors(settings: &Settings, automatic: u32, up_speed: f64, down_speed
     let text = settings.color_or(Field::TextColor, automatic);
     let up_value = speed_color(settings, up_speed, text);
     let down_value = speed_color(settings, down_speed, text);
-    let background = u32::try_from(settings.get(Field::BackgroundColor)).ok();
+    let background = settings.background();
     ReadoutColors {
         up_arrow: settings.color_or(Field::UpColor, up_value),
         down_arrow: settings.color_or(Field::DownColor, down_value),

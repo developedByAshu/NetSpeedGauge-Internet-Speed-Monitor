@@ -72,65 +72,81 @@ Click $settings 90 240
 Click $settings 487 225
 Click $settings 589 279
 
-# Icon style: letters, then back to arrows.
+# Start the Appearance page from its defaults, so the positions below hold. Their file comes back at the end.
+Click $settings 616 428
+Check 'reset opens the icons section' ((Saved 'show_icons') -eq '1')
+Check 'reset collapses the background section' ((Saved 'show_background') -eq '0')
+Check 'reset collapses the colour by speed section' ((Saved 'color_coding') -eq '0')
+
+function Scroll-Settings($wheel) { [NetSpeedGaugeTools.Win]::PostMessage($settings, 0x020A, $wheel, [IntPtr]::Zero) | Out-Null; Start-Sleep -Milliseconds 300 }
+$wheelDown = [IntPtr](([int](-480 -band 0xFFFF)) -shl 16)
+$wheelUp = [IntPtr]((480) -shl 16)
+
+# Text: download on top swaps the rows, then back. It stays available whatever the sections below do.
 Click $settings 90 120
 Save-Window $settings 'settings-appearance-real'
-Click $settings 563 321
+$swapBefore = Saved 'swap_rows'
+Click $settings 400 483
+Check 'download on top changes' ((Saved 'swap_rows') -ne $swapBefore)
+Save-Window $settings 'settings-swapped'
+Save-Taskbar 'swapped'
+Click $settings 400 483
+Check 'download on top restored' ((Saved 'swap_rows') -eq $swapBefore)
+
+# These positions are with the page scrolled to its end and the two lower sections collapsed.
+Scroll-Settings $wheelDown
+$iconStyleRow = 344
+$thicknessRow = 398
+$uploadRow = 452
+$downloadRow = 506
+
+# Icon style: letters, triangles, then back to arrows.
+Click $settings 622 $iconStyleRow
 Check 'icon style saves as letters' ((Saved 'arrow_style') -eq '2')
 Save-Taskbar 'letters'
-Click $settings 505 321
+Click $settings 572 $iconStyleRow
 Check 'triangles save' ((Saved 'arrow_style') -eq '1')
 Save-Taskbar 'triangles'
-Click $settings 467 321
+Click $settings 525 $iconStyleRow
 Check 'arrows set' ((Saved 'arrow_style') -eq '0')
 
 # Icon thickness: down to the thinnest, up to the thickest, past both limits, then back.
 $thicknessBefore = [int](Saved 'icon_thickness')
-1..3 | ForEach-Object { Click $settings 525 375 }
+1..3 | ForEach-Object { Click $settings 525 $thicknessRow }
 Check 'thickness stops at 1' ((Saved 'icon_thickness') -eq '1')
 Save-Taskbar 'thickness-1'
 Check-Clear-Of-Tray 'thickness 1'
 foreach ($level in 2..4) {
-    Click $settings 631 375
+    Click $settings 631 $thicknessRow
     Check "thickness saves as $level" ((Saved 'icon_thickness') -eq "$level")
     Save-Taskbar "thickness-$level"
     Check-Clear-Of-Tray "thickness $level"
 }
-Click $settings 631 375
+Click $settings 631 $thicknessRow
 Check 'thickness stops at 4' ((Saved 'icon_thickness') -eq '4')
 Save-Window $settings 'settings-thickness'
-for ($level = 4; $level -gt $thicknessBefore; $level--) { Click $settings 525 375 }
+for ($level = 4; $level -gt $thicknessBefore; $level--) { Click $settings 525 $thicknessRow }
 Check 'thickness restored' ((Saved 'icon_thickness') -eq "$thicknessBefore")
 
-# No icons: thickness and the icon colours grey out and ignore clicks, then work again.
-Click $settings 617 321
-Check 'no icons saves' ((Saved 'arrow_style') -eq '3')
-$upColourBefore = Saved 'up_color'
-Click $settings 631 375
-Check 'thickness ignores clicks with no icons' ((Saved 'icon_thickness') -eq "$thicknessBefore")
-Click $settings 636 429
-Check 'upload colour ignores clicks with no icons' ((Saved 'up_color') -eq $upColourBefore)
+# Icons heading: off collapses the rows and removes the icons, on brings the same choices back.
+Click $settings 622 $iconStyleRow
+Click $settings 400 301
+Check 'icons toggle saves as off' ((Saved 'show_icons') -eq '0')
+Check 'icons off keeps the chosen style' ((Saved 'arrow_style') -eq '2')
 Save-Window $settings 'settings-no-icons'
 Save-Taskbar 'no-icons'
-Click $settings 467 321
-Check 'arrows back' ((Saved 'arrow_style') -eq '0')
-Click $settings 636 429
-Check 'upload colour works again' ((Saved 'up_color') -ne $upColourBefore)
-Click $settings 636 429
+Check-Clear-Of-Tray 'no icons'
+# The shorter page scrolls back, so the heading has moved.
+Click $settings 400 514
+Check 'icons toggle saves as on' ((Saved 'show_icons') -eq '1')
 Save-Window $settings 'settings-icons-back'
-
-# Download on top: swaps the rows, then back.
-$swapBefore = Saved 'swap_rows'
-Click $settings 400 537
-Check 'download on top changes' ((Saved 'swap_rows') -ne $swapBefore)
-Save-Window $settings 'settings-swapped'
-Save-Taskbar 'swapped'
-Click $settings 400 537
-Check 'download on top restored' ((Saved 'swap_rows') -eq $swapBefore)
+Scroll-Settings $wheelDown
+Click $settings 525 $iconStyleRow
+Check 'arrows back' ((Saved 'arrow_style') -eq '0')
 
 # Chosen icon colours: pink upload and green download must reach the usage window and hover card.
-Click $settings 636 429
-Click $settings 536 483
+Click $settings 636 $uploadRow
+Click $settings 536 $downloadRow
 Check 'upload colour saves as pink' ((Saved 'up_color') -eq [string]0xF472B6)
 Check 'download colour saves as green' ((Saved 'down_color') -eq [string]0x4ADE80)
 [NetSpeedGaugeTools.Win]::PostMessage($readout, 0x8002, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
@@ -154,30 +170,37 @@ if ($hoverCard -ne [IntPtr]::Zero) { Save-Window $hoverCard 'hover-chosen-colour
 Start-Sleep -Milliseconds 400
 
 # Theme: light, then back to the system theme.
+Scroll-Settings $wheelUp
 Click $settings 572 129
 Check 'theme saves as light' ((Saved 'window_theme') -eq '1')
 Save-Window $settings 'settings-light'
 Click $settings 470 129
 Check 'system theme restored' ((Saved 'window_theme') -eq '0')
 
-# Background: a blue box behind the numbers, seen during real traffic, then none.
-$wheelDown = [IntPtr](([int](-480 -band 0xFFFF)) -shl 16)
-$wheelUp = [IntPtr]((480) -shl 16)
-[NetSpeedGaugeTools.Win]::PostMessage($settings, 0x020A, $wheelDown, [IntPtr]::Zero) | Out-Null
-Start-Sleep -Milliseconds 300
-Click $settings 586 549
-Check 'background colour saves' ((Saved 'background_color') -ne '-1')
-[NetSpeedGaugeTools.Win]::PostMessage($settings, 0x020A, $wheelUp, [IntPtr]::Zero) | Out-Null
-Start-Sleep -Milliseconds 300
+# Background heading: on shows its rows and a box behind the numbers during real traffic, off keeps the colour.
+Scroll-Settings $wheelDown
+Click $settings 400 559
+Check 'background toggle saves as on' ((Saved 'show_background') -eq '1')
+Save-Window $settings 'settings-background-open'
+Click $settings 586 603
+Check 'background colour saves' ((Saved 'background_color') -eq [string]0x60A5FA)
+Scroll-Settings $wheelUp
 Save-Window $settings 'settings-background'
 $download = Start-Process curl.exe -ArgumentList '-s', '-o', 'NUL', '-m', '8', 'https://ash-speed.hetzner.com/100MB.bin' -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 4
 Save-Taskbar 'background'
 $download.WaitForExit(9000) | Out-Null
-[NetSpeedGaugeTools.Win]::PostMessage($settings, 0x020A, $wheelDown, [IntPtr]::Zero) | Out-Null
-Start-Sleep -Milliseconds 300
-Click $settings 386 549
-Check 'background removed' ((Saved 'background_color') -eq '-1')
+Scroll-Settings $wheelDown
+Click $settings 400 505
+Check 'background toggle saves as off' ((Saved 'show_background') -eq '0')
+Check 'background off keeps the colour' ((Saved 'background_color') -eq [string]0x60A5FA)
+
+# Colour by speed heading: on shows its rows, off collapses them.
+Click $settings 400 601
+Check 'colour by speed toggle saves as on' ((Saved 'color_coding') -eq '1')
+Save-Window $settings 'settings-speed-colours-open'
+Click $settings 400 601
+Check 'colour by speed toggle saves as off' ((Saved 'color_coding') -eq '0')
 
 # Unit: megabits, then back to megabytes.
 Click $settings 90 160

@@ -45,6 +45,8 @@ const HEADER_HEIGHT: i32 = 62;
 const ROW_HEIGHT: i32 = 50;
 const ROW_GAP: i32 = 4;
 const SECTION_GAP: i32 = 34;
+// The height a heading toggle is centred within, which lines it up with the heading text.
+const HEADING_TOGGLE_ROW: i32 = 46;
 const PREVIEW_HEIGHT: i32 = 92;
 const ABOUT_CARD_HEIGHT: i32 = 96;
 const PRIVACY_LINE: i32 = 26;
@@ -102,6 +104,8 @@ enum Kind {
 #[derive(Clone, Copy)]
 enum Row {
     Section(&'static str),
+    // A heading with a toggle: on shows the rows under it, off collapses them.
+    ToggleSection { title: &'static str, field: Field },
     Preview,
     Setting { field: Field, label: &'static str, hint: &'static str, kind: Kind },
     StartWithWindows,
@@ -122,21 +126,20 @@ const APPEARANCE_ROWS: &[Row] = &[
     Row::Section("Theme"),
     setting(Field::WindowTheme, "NetSpeedGauge windows", "", Kind::Segments(&["Same as system", "Light", "Dark"])),
     Row::Preview,
-    Row::Section("Icons"),
-    setting(Field::ArrowStyle, "Icon style", "", Kind::Segments(&["\u{2191} \u{2193}", "\u{25B2} \u{25BC}", "U D", "None"])),
-    setting(Field::IconThickness, "Icon thickness", "", Kind::Stepper { step: 1, suffix: "" }),
-    setting(Field::UpColor, "Upload colour", "", Kind::Swatches { auto_label: "A" }),
-    setting(Field::DownColor, "Download colour", "", Kind::Swatches { auto_label: "A" }),
-    setting(Field::SwapRows, "Download on top", "Swaps the two rows", Kind::Toggle),
     Row::Section("Text"),
     setting(Field::FontFamily, "Font", "", Kind::Segments(&["Segoe", "Semibold", "Bahnschrift", "Consolas"])),
     setting(Field::FontPoints, "Size", "", Kind::Stepper { step: 1, suffix: " pt" }),
     setting(Field::TextColor, "Colour", "", Kind::Swatches { auto_label: "A" }),
-    Row::Section("Background"),
-    setting(Field::BackgroundColor, "Colour", "", Kind::Swatches { auto_label: "\u{2013}" }),
+    setting(Field::SwapRows, "Download on top", "Swaps the two rows", Kind::Toggle),
+    Row::ToggleSection { title: "Icons", field: Field::ShowIcons },
+    setting(Field::ArrowStyle, "Icon style", "", Kind::Segments(&["\u{2191} \u{2193}", "\u{25B2} \u{25BC}", "U D"])),
+    setting(Field::IconThickness, "Icon thickness", "", Kind::Stepper { step: 1, suffix: "" }),
+    setting(Field::UpColor, "Upload colour", "", Kind::Swatches { auto_label: "A" }),
+    setting(Field::DownColor, "Download colour", "", Kind::Swatches { auto_label: "A" }),
+    Row::ToggleSection { title: "Background", field: Field::ShowBackground },
+    setting(Field::BackgroundColor, "Colour", "", Kind::Swatches { auto_label: "" }),
     setting(Field::BackgroundOpacity, "Opacity", "", Kind::Stepper { step: 10, suffix: "%" }),
-    Row::Section("Colour by speed"),
-    setting(Field::ColorCoding, "Change colour with speed", "", Kind::Toggle),
+    Row::ToggleSection { title: "Colour by speed", field: Field::ColorCoding },
     setting(Field::LowLimit, "Slow below", "", Kind::Stepper { step: 1, suffix: " MBps" }),
     setting(Field::LowColor, "Slow colour", "", Kind::Swatches { auto_label: "" }),
     setting(Field::HighLimit, "Fast above", "", Kind::Stepper { step: 5, suffix: " MBps" }),
@@ -211,7 +214,10 @@ const UNITS_PAGE: usize = 2;
 pub fn page_fields(page: usize) -> Vec<Field> {
     page_rows(page)
         .iter()
-        .filter_map(|row| if let Row::Setting { field, .. } = row { Some(*field) } else { None })
+        .filter_map(|row| match row {
+            Row::Setting { field, .. } | Row::ToggleSection { field, .. } => Some(*field),
+            _ => None,
+        })
         .collect()
 }
 
@@ -388,6 +394,12 @@ impl SettingsWindow {
             y = self.draw_row(*row, left, y, width);
         }
         self.content_height = y + self.scroll - top + self.px(MARGIN);
+        // Collapsing a section can leave the page scrolled past its new end.
+        let limit = (self.content_height - (self.px(HEIGHT) - top)).max(0);
+        if self.scroll > limit {
+            self.scroll = limit;
+            self.invalidate();
+        }
     }
 
     fn row_card(&mut self, left: i32, y: i32, width: i32, height: i32) {
@@ -416,11 +428,25 @@ impl SettingsWindow {
                 self.canvas.text(left + self.px(2), text_y, title, self.fonts.strong, self.theme.text, Align::Left);
                 y + self.px(SECTION_GAP) + self.px(8)
             }
+            Row::ToggleSection { title, field } => {
+                let text_y = y + self.px(14);
+                self.canvas.text(left + self.px(2), text_y, title, self.fonts.strong, self.theme.text, Align::Left);
+                let is_on = self.settings.borrow().is_on(field);
+                // Centred on the heading text, in the same column as the toggles in the rows below.
+                self.draw_toggle(left + width - self.px(14), y, self.px(HEADING_TOGGLE_ROW), is_on);
+                let height = self.px(SECTION_GAP) + self.px(8);
+                self.add_hit(left, y, width, height, Action::Set(field, i64::from(!is_on)));
+                y + height
+            }
             Row::Preview => {
                 self.draw_preview(left, y, width);
                 y + self.px(PREVIEW_HEIGHT) + self.px(ROW_GAP)
             }
             Row::Setting { field, label, hint, kind } => {
+                let is_collapsed = Settings::section_switch(field).is_some_and(|switch| !self.settings.borrow().is_on(switch));
+                if is_collapsed {
+                    return y;
+                }
                 let hits_before = self.hits.len();
                 self.row_card(left, y, width, row_height);
                 self.row_label(left, y, label, hint);
@@ -559,7 +585,7 @@ impl SettingsWindow {
         let arrow_width =
             rows.iter().map(|row| self.canvas.text_width(row.0, self.fonts.preview_arrow)).max().unwrap_or(0);
         let arrow_left = arrow_column_left(right, widest, gap, stroke, arrow_width);
-        if let Ok(background) = u32::try_from(settings.get(Field::BackgroundColor)) {
+        if let Some(background) = settings.background() {
             let amount = settings.get(Field::BackgroundOpacity) as f32 / 100.0;
             let (pad, box_x) = (self.px(7), arrow_left - self.px(7));
             self.canvas.round_rect(box_x, bar_y + self.px(4), right + pad - box_x, bar_height - self.px(8), self.px(6) as f32, mix(bar_color, background, amount));

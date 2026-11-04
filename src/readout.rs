@@ -147,7 +147,7 @@ impl Readout {
         let row_gap = ROW_GAP * dpi as i32 / BASE_DPI;
         let arrow_stroke = settings.icon_stroke(dpi);
         // SAFETY: the surface and fonts are owned by this struct and released in Drop.
-        let has_background = settings.get(Field::BackgroundColor) >= 0;
+        let has_background = settings.background().is_some();
         let box_padding = if has_background { BOX_SIDE_PADDING * dpi as i32 / BASE_DPI } else { 0 };
         let top_offset = if has_background { BOX_TOP_PADDING * dpi as i32 / BASE_DPI } else { 0 };
         let box_radius = (BOX_RADIUS * dpi as i32 / BASE_DPI) as f32;

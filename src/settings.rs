@@ -25,15 +25,19 @@ pub const PALETTE: [u32; 10] = [
 
 pub const FONT_FAMILIES: [&str; 4] = ["Segoe UI", "Segoe UI Semibold", "Bahnschrift", "Consolas"];
 
-/// The shapes offered for the upload and download markers, as (up, down). The last means none.
-pub const ARROW_STYLES: [(&str, &str); 4] =
-    [("\u{2191}", "\u{2193}"), ("\u{25B2}", "\u{25BC}"), ("U", "D"), ("", "")];
+/// The shapes offered for the upload and download markers, as (up, down).
+pub const ARROW_STYLES: [(&str, &str); 3] = [("\u{2191}", "\u{2193}"), ("\u{25B2}", "\u{25BC}"), ("U", "D")];
+const NO_ARROWS: (&str, &str) = ("", "");
+// Older versions saved "no icons" as this icon style and "no background" as a negative colour.
+const OLD_NO_ICONS_STYLE: &str = "3";
+const OLD_NO_BACKGROUND_SIGN: char = '-';
+// The blue in the palette: visible behind white text, unlike white itself.
+const FIRST_BACKGROUND_COLOR: i64 = 0x60A5FA;
 
 const BASE_DPI: i64 = 96;
 const REGULAR_WEIGHT: i32 = 400;
 const HEAVY_WEIGHT: i32 = 900;
 const THINNEST_ICON: i64 = 1;
-const NO_ICONS_STYLE: i64 = ARROW_STYLES.len() as i64 - 1;
 const UPDATE_MILLISECONDS: [u32; 4] = [500, 1000, 2000, 5000];
 const KEEP_DAYS_CHOICES: [i32; 4] = [93, 186, 366, 731];
 const UNITS: [Unit; 4] = [Unit::BytesDecimal, Unit::BitsDecimal, Unit::BytesBinary, Unit::BitsBinary];
@@ -71,6 +75,8 @@ pub enum Field {
     KeepOnTop,
     WindowTheme,
     ClickAction,
+    ShowIcons,
+    ShowBackground,
 }
 
 /// What resting on or clicking the numbers does.
@@ -99,15 +105,15 @@ const fn spec(field: Field, key: &'static str, default: i64, min: i64, max: i64)
 
 const MAX_COLOR: i64 = 0xFF_FFFF;
 
-pub const FIELDS: [FieldSpec; 30] = [
-    spec(Field::ArrowStyle, "arrow_style", 0, 0, 3),
+pub const FIELDS: [FieldSpec; 32] = [
+    spec(Field::ArrowStyle, "arrow_style", 0, 0, ARROW_STYLES.len() as i64 - 1),
     spec(Field::IconThickness, "icon_thickness", 2, THINNEST_ICON, 4),
     spec(Field::FontFamily, "font_family", 0, 0, 3),
     spec(Field::FontPoints, "font_points", 9, 7, 12),
     spec(Field::TextColor, "text_color", COLOR_AUTO, COLOR_AUTO, MAX_COLOR),
     spec(Field::UpColor, "up_color", COLOR_AUTO, COLOR_AUTO, MAX_COLOR),
     spec(Field::DownColor, "down_color", COLOR_AUTO, COLOR_AUTO, MAX_COLOR),
-    spec(Field::BackgroundColor, "background_color", COLOR_AUTO, COLOR_AUTO, MAX_COLOR),
+    spec(Field::BackgroundColor, "background_color", FIRST_BACKGROUND_COLOR, 0, MAX_COLOR),
     spec(Field::BackgroundOpacity, "background_opacity", 60, 10, 100),
     spec(Field::ColorCoding, "color_coding", 0, 0, 1),
     spec(Field::LowLimit, "low_limit", 1, 1, 100),
@@ -130,6 +136,8 @@ pub const FIELDS: [FieldSpec; 30] = [
     spec(Field::KeepOnTop, "keep_on_top", 0, 0, 1),
     spec(Field::WindowTheme, "window_theme", 0, 0, 2),
     spec(Field::ClickAction, "click_action", 2, 0, 2),
+    spec(Field::ShowIcons, "show_icons", 1, 0, 1),
+    spec(Field::ShowBackground, "show_background", 0, 0, 1),
 ];
 
 /// All the user's choices.
@@ -184,7 +192,22 @@ impl Settings {
     }
 
     pub fn arrow_symbols(&self) -> (&'static str, &'static str) {
-        ARROW_STYLES[self.get(Field::ArrowStyle) as usize]
+        if self.is_on(Field::ShowIcons) { ARROW_STYLES[self.get(Field::ArrowStyle) as usize] } else { NO_ARROWS }
+    }
+
+    /// Returns the colour behind the numbers, or None while the background is off.
+    pub fn background(&self) -> Option<u32> {
+        if self.is_on(Field::ShowBackground) { u32::try_from(self.get(Field::BackgroundColor)).ok() } else { None }
+    }
+
+    /// Returns the heading toggle that shows or collapses a setting's row, if it has one.
+    pub fn section_switch(field: Field) -> Option<Field> {
+        match field {
+            Field::ArrowStyle | Field::IconThickness | Field::UpColor | Field::DownColor => Some(Field::ShowIcons),
+            Field::BackgroundColor | Field::BackgroundOpacity => Some(Field::ShowBackground),
+            Field::LowLimit | Field::LowColor | Field::HighLimit | Field::HighColor => Some(Field::ColorCoding),
+            _ => None,
+        }
     }
 
     /// Returns the font weight for the icons. Only the thinnest level uses the regular weight.
@@ -198,7 +221,7 @@ impl Settings {
      * The taskbar readout and the Settings preview both use it.
      */
     pub fn icon_stroke(&self, dpi: u32) -> i32 {
-        if self.get(Field::ArrowStyle) == NO_ICONS_STYLE {
+        if !self.is_on(Field::ShowIcons) {
             return 0;
         }
         ((self.get(Field::IconThickness) - THINNEST_ICON) * i64::from(dpi) / BASE_DPI) as i32
@@ -207,9 +230,6 @@ impl Settings {
     /// Returns false when another choice leaves this one with no effect. Its value is kept for when it applies again.
     pub fn is_relevant(&self, field: Field) -> bool {
         match field {
-            Field::IconThickness | Field::UpColor | Field::DownColor => self.get(Field::ArrowStyle) != NO_ICONS_STYLE,
-            Field::BackgroundOpacity => self.get(Field::BackgroundColor) != COLOR_AUTO,
-            Field::LowLimit | Field::LowColor | Field::HighLimit | Field::HighColor => self.is_on(Field::ColorCoding),
             Field::ShortLabels => !self.is_on(Field::HideSuffix),
             _ => true,
         }
@@ -270,10 +290,18 @@ impl Settings {
                 if value.trim() == "0" {
                     settings.set(*field, 0);
                 }
+            } else if key == "arrow_style" && value.trim() == OLD_NO_ICONS_STYLE {
+                settings.set(Field::ShowIcons, 0);
+            } else if key == "background_color" && value.trim().starts_with(OLD_NO_BACKGROUND_SIGN) {
+                // Off is already the default, and this keeps the first colour for when it is turned on.
             } else if let (Some(spec), Ok(number)) =
                 (FIELDS.iter().find(|spec| spec.key == key), value.trim().parse::<i64>())
             {
                 settings.set(spec.field, number);
+                // An older file with a colour had the background on. A newer file's own switch comes later and wins.
+                if spec.field == Field::BackgroundColor {
+                    settings.set(Field::ShowBackground, 1);
+                }
             }
         }
         settings

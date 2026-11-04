@@ -41,7 +41,7 @@ fn values_are_kept_within_their_limits() {
     assert_eq!(settings.get(Field::FontPoints), 12);
     settings.set(Field::FontPoints, -3);
     assert_eq!(settings.get(Field::FontPoints), 7);
-    assert_eq!(Settings::from_text("arrow_style=99\n").get(Field::ArrowStyle), 3);
+    assert_eq!(Settings::from_text("arrow_style=99\n").get(Field::ArrowStyle), 2);
 }
 
 #[test]
@@ -55,13 +55,15 @@ fn unit_choices_map_to_megabytes_and_megabits() {
 }
 
 #[test]
-fn icon_styles_include_arrows_letters_and_none() {
+fn icon_styles_include_arrows_and_letters_and_the_section_can_turn_them_off() {
     let mut settings = Settings::default();
     assert_eq!(settings.arrow_symbols(), ("\u{2191}", "\u{2193}"));
     settings.set(Field::ArrowStyle, 2);
     assert_eq!(settings.arrow_symbols(), ("U", "D"));
-    settings.set(Field::ArrowStyle, 3);
+    settings.set(Field::ShowIcons, 0);
     assert_eq!(settings.arrow_symbols(), ("", ""));
+    settings.set(Field::ShowIcons, 1);
+    assert_eq!(settings.arrow_symbols(), ("U", "D"));
 }
 
 #[test]
@@ -87,29 +89,61 @@ fn icon_thickness_gets_heavier_at_every_level_and_stays_in_range() {
 }
 
 #[test]
-fn settings_with_no_effect_are_reported_and_keep_their_values() {
+fn turning_a_section_off_and_on_keeps_its_choices() {
     let mut settings = Settings::default();
-    assert!(settings.is_relevant(Field::IconThickness) && settings.is_relevant(Field::UpColor));
     settings.set(Field::IconThickness, 3);
-    settings.set(Field::ArrowStyle, 3);
-    for field in [Field::IconThickness, Field::UpColor, Field::DownColor] {
-        assert!(!settings.is_relevant(field));
-    }
+    settings.set(Field::ShowIcons, 0);
     assert_eq!(settings.icon_stroke(96), 0);
     assert_eq!(settings.get(Field::IconThickness), 3);
-    settings.set(Field::ArrowStyle, 0);
+    settings.set(Field::ShowIcons, 1);
     assert_eq!(settings.icon_stroke(96), 2);
 
-    assert!(!settings.is_relevant(Field::BackgroundOpacity));
-    settings.set(Field::BackgroundColor, 0x60A5FA);
-    assert!(settings.is_relevant(Field::BackgroundOpacity));
+    assert_eq!(settings.background(), None);
+    settings.set(Field::ShowBackground, 1);
+    assert_eq!(settings.background(), Some(0x60A5FA));
+    settings.set(Field::BackgroundColor, 0xF87171);
+    settings.set(Field::ShowBackground, 0);
+    assert_eq!(settings.background(), None);
+    settings.set(Field::ShowBackground, 1);
+    assert_eq!(settings.background(), Some(0xF87171));
+    assert_eq!(Settings::from_text(&settings.to_text()), settings);
+    settings.set(Field::ShowBackground, 0);
+    assert_eq!(Settings::from_text(&settings.to_text()), settings);
+}
 
-    for field in [Field::LowLimit, Field::LowColor, Field::HighLimit, Field::HighColor] {
-        assert!(!settings.is_relevant(field));
+#[test]
+fn every_row_under_a_toggle_heading_names_that_toggle() {
+    for field in [Field::ArrowStyle, Field::IconThickness, Field::UpColor, Field::DownColor] {
+        assert_eq!(Settings::section_switch(field), Some(Field::ShowIcons));
     }
-    settings.set(Field::ColorCoding, 1);
-    assert!(settings.is_relevant(Field::HighColor));
+    for field in [Field::BackgroundColor, Field::BackgroundOpacity] {
+        assert_eq!(Settings::section_switch(field), Some(Field::ShowBackground));
+    }
+    for field in [Field::LowLimit, Field::LowColor, Field::HighLimit, Field::HighColor] {
+        assert_eq!(Settings::section_switch(field), Some(Field::ColorCoding));
+    }
+    for field in [Field::FontFamily, Field::FontPoints, Field::TextColor, Field::SwapRows] {
+        assert_eq!(Settings::section_switch(field), None);
+    }
+}
 
+#[test]
+fn old_files_with_no_icons_or_no_background_carry_over() {
+    let old = Settings::from_text("arrow_style=3\nbackground_color=-1\n");
+    assert!(!old.is_on(Field::ShowIcons));
+    assert_eq!(old.get(Field::ArrowStyle), 0);
+    assert_eq!(old.background(), None);
+    assert_eq!(old.get(Field::BackgroundColor), 0x60A5FA);
+
+    let with_colour = Settings::from_text("arrow_style=1\nbackground_color=16218294\n");
+    assert!(with_colour.is_on(Field::ShowIcons));
+    assert_eq!(with_colour.get(Field::ArrowStyle), 1);
+    assert_eq!(with_colour.background(), Some(16218294));
+}
+
+#[test]
+fn only_short_labels_grey_out_now_that_sections_collapse() {
+    let mut settings = Settings::default();
     assert!(settings.is_relevant(Field::ShortLabels));
     settings.set(Field::HideSuffix, 1);
     assert!(!settings.is_relevant(Field::ShortLabels));
@@ -215,7 +249,13 @@ fn reset_restores_defaults_for_a_page_without_touching_others() {
     let mut settings = Settings::default();
     settings.set(Field::ArrowStyle, 2);
     settings.set(Field::UpdateRate, 3);
+    settings.set(Field::ShowIcons, 0);
+    settings.set(Field::ShowBackground, 1);
+    settings.set(Field::ColorCoding, 1);
     page_fields(1).into_iter().for_each(|field| settings.reset(field));
     assert_eq!(settings.get(Field::ArrowStyle), 0);
     assert_eq!(settings.get(Field::UpdateRate), 3);
+    assert!(settings.is_on(Field::ShowIcons));
+    assert!(!settings.is_on(Field::ShowBackground));
+    assert!(!settings.is_on(Field::ColorCoding));
 }
