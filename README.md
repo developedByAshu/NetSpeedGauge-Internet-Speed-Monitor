@@ -23,7 +23,7 @@
   <tr>
     <td align="center" width="170"><h3>Under 4 MB</h3>RAM on Windows</td>
     <td align="center" width="170"><h3>14 MB</h3>RAM on Mac</td>
-    <td align="center" width="170"><h3>408 KB</h3>Windows program, no install</td>
+    <td align="center" width="170"><h3>411 KB</h3>Windows program, no install</td>
     <td align="center" width="170"><h3>0</h3>internet connections</td>
   </tr>
 </table>
