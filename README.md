@@ -22,7 +22,7 @@
   <tr>
     <td align="center" width="170"><h3>Under 4 MB</h3>RAM on the taskbar</td>
     <td align="center" width="170"><h3>0.013%</h3>CPU</td>
-    <td align="center" width="170"><h3>404 KB</h3>one file, no install</td>
+    <td align="center" width="170"><h3>408 KB</h3>one file, no install</td>
     <td align="center" width="170"><h3>0</h3>internet connections</td>
   </tr>
 </table>
@@ -118,7 +118,7 @@ It shows on the main taskbar only.
         <tr><td>RAM with Usage open</td><td>4.3 MB</td></tr>
         <tr><td>RAM with Settings open</td><td>6.1 MB</td></tr>
         <tr><td>CPU</td><td>0.013% of the processor</td></tr>
-        <tr><td>Download</td><td>404 KB</td></tr>
+        <tr><td>Download</td><td>408 KB</td></tr>
       </table>
       <sub>Windows 11, 10 minutes of normal use. Yours may differ. Usage and Settings give their memory back when closed.</sub>
     </td>
