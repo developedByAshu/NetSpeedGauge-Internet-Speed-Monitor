@@ -152,7 +152,7 @@ const UNITS_ROWS: &[Row] = &[
     Row::Preview,
     Row::Section("Speed"),
     setting(Field::Unit, "Unit", "Megabytes or megabits", Kind::Segments(&["MBps", "Mbps", "MiBps", "Mibps"])),
-    setting(Field::Scale, "Scale", "", Kind::Segments(&["Auto", "Always mega"])),
+    setting(Field::Scale, "Scale", "", Kind::Segments(&["Auto", "Always Mega"])),
     setting(Field::Decimals, "Decimal places", "", Kind::Stepper { step: 1, suffix: "" }),
     Row::Section("Display"),
     setting(Field::HideSuffix, "Hide the unit", "Show only the number", Kind::Toggle),

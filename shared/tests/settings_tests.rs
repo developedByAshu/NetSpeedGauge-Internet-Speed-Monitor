@@ -150,10 +150,10 @@ fn only_short_labels_grey_out_now_that_sections_collapse() {
 }
 
 #[test]
-fn hover_shows_the_card_and_click_opens_usage_by_default() {
+fn hover_does_nothing_and_click_shows_the_card_by_default() {
     let settings = Settings::default();
-    assert_eq!(settings.meter_action(Field::HoverAction), MeterAction::Card);
-    assert_eq!(settings.meter_action(Field::ClickAction), MeterAction::UsageWindow);
+    assert_eq!(settings.meter_action(Field::HoverAction), MeterAction::Nothing);
+    assert_eq!(settings.meter_action(Field::ClickAction), MeterAction::Card);
 }
 
 #[test]
@@ -162,7 +162,8 @@ fn old_on_off_choices_carry_over() {
     assert_eq!(both_off.meter_action(Field::HoverAction), MeterAction::Nothing);
     assert_eq!(both_off.meter_action(Field::ClickAction), MeterAction::Nothing);
     let both_on = Settings::from_text("hover_card=1\nclick_opens_usage=1\n");
-    assert_eq!(both_on, Settings::default());
+    assert_eq!(both_on.meter_action(Field::HoverAction), MeterAction::Card);
+    assert_eq!(both_on.meter_action(Field::ClickAction), MeterAction::UsageWindow);
 }
 
 #[test]
