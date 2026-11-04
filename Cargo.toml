@@ -6,7 +6,7 @@ members = ["shared", "windows", "mac"]
 version = "1.2.0"
 edition = "2021"
 license = "GPL-3.0-only"
-repository = "https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor"
+repository = "https://github.com/developedByAshu/net-speed-gauge"
 
 [profile.release]
 opt-level = "s"
