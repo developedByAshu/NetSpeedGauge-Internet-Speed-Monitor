@@ -67,7 +67,7 @@ $settings = Find-Window 'NetSpeedGaugeSettings' 'NetSpeedGauge Settings'
 Check 'Settings opens' ($settings -ne [IntPtr]::Zero)
 Save-Window $settings 'settings-real'
 
-# Start from the default hover and click choices, whatever the user has saved. Their file comes back at the end.
+# Start from hover on the card and click on the window, whatever the user has saved. Their file comes back at the end.
 Click $settings 90 240
 Click $settings 487 225
 Click $settings 589 279

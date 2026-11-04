@@ -5,24 +5,25 @@
 </p>
 
 <p align="center">
-  A tiny internet speed monitor for the Windows taskbar. See your upload and download speed, and how much data you used today, this week, this month and this year.
+  #1 lightweight speed monitor for Windows and Mac. See your upload and download speed, and how much data you used today, this week, this month and this year.
 </p>
 
 <p align="center">
-  <a href="https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest"><img src="https://img.shields.io/badge/Download_for_Windows-2563EB?style=for-the-badge" alt="Download for Windows"></a>
+  <a href="https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest"><img src="https://img.shields.io/badge/Download-2563EB?style=for-the-badge" alt="Download"></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/github/v/release/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor?label=version" alt="Latest version">
   <img src="https://img.shields.io/badge/Windows-10_%7C_11-2563EB" alt="Windows 10 and 11">
+  <img src="https://img.shields.io/badge/Mac-Apple_silicon-2563EB" alt="Mac with Apple silicon">
   <img src="https://img.shields.io/badge/licence-GPL--3.0-16A34A" alt="GPL-3.0 licence">
 </p>
 
 <table align="center">
   <tr>
-    <td align="center" width="170"><h3>Under 4 MB</h3>RAM on the taskbar</td>
-    <td align="center" width="170"><h3>0.013%</h3>CPU</td>
-    <td align="center" width="170"><h3>408 KB</h3>one file, no install</td>
+    <td align="center" width="170"><h3>Under 4 MB</h3>RAM on Windows</td>
+    <td align="center" width="170"><h3>14 MB</h3>RAM on Mac</td>
+    <td align="center" width="170"><h3>408 KB</h3>Windows program, no install</td>
     <td align="center" width="170"><h3>0</h3>internet connections</td>
   </tr>
 </table>
@@ -42,7 +43,7 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
   </tr>
   <tr>
     <td width="50%" align="center"><img src="docs/images/tile-usage.png" alt="Internet data usage by day, week, month and year on Windows"><br><sub>Usage by day, week, month and year (sample data)</sub></td>
-    <td width="50%" align="center"><img src="docs/images/tile-taskbar.png" alt="Upload and download speed on the Windows taskbar, and the hover card with today's and this month's data usage"><br><sub>On the taskbar. Hover for today and this month</sub></td>
+    <td width="50%" align="center"><img src="docs/images/tile-taskbar.png" alt="Upload and download speed on the Windows taskbar, and the hover card with today's and this month's data usage"><br><sub>On the taskbar. Click for today and this month</sub></td>
   </tr>
 </table>
 
@@ -65,14 +66,14 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
         <li>Day, week, month and year charts</li>
         <li>Kept for up to 2 years</li>
         <li>Split by adapter</li>
-        <li>Keeps counting across Windows restarts</li>
-        <li>Closed the app? It catches up when you reopen it, if Windows has not restarted since</li>
+        <li>Keeps counting across restarts</li>
+        <li>Closed the app? It catches up when you reopen it, if the computer has not restarted since</li>
       </ul>
     </td>
     <td valign="top" width="33%">
       <b>Look</b>
       <ul>
-        <li>Light, dark or same as Windows</li>
+        <li>Light, dark or same as your system</li>
         <li>Icons, thickness, colours, font, size and background</li>
         <li>Colours can change with speed</li>
         <li>Your colours follow into Usage and the hover card</li>
@@ -84,6 +85,8 @@ So this one counts every adapter, keeps 2 years of history, and stays out of the
 
 ## Install
 
+### Windows
+
 1. Download `NetSpeedGauge-x64.exe` from [Releases](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest). On a Windows on ARM PC, take `NetSpeedGauge-arm64.exe`.
 2. Put it in a folder you will keep, then run it.
 3. To open it at sign in, turn on **Start with Windows** in Settings.
@@ -94,36 +97,43 @@ Windows may show a SmartScreen warning because the program is not code signed ye
 
 To remove it, turn off **Start with Windows**, choose **Exit**, then delete the file and `%APPDATA%\NetSpeedGauge`.
 
+### Mac (Apple silicon only)
+
+1. Download `NetSpeedGauge-mac-arm64.zip` from [Releases](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/releases/latest) and unzip it.
+2. Move `NetSpeedGauge` to Applications, then open it.
+3. macOS blocks it the first time because the app is not signed by Apple. Open **System Settings**, **Privacy & Security**, choose **Open Anyway**, then open it again.
+4. To open it at login, turn on **Start at login** in Settings.
+
+To update, choose **Quit**, then replace the old app with the new one. Your settings and usage stay as they are.
+
+To remove it, turn off **Start at login**, choose **Quit**, then delete the app and `~/Library/Application Support/NetSpeedGauge`.
+
 ## Works on
 
-Tested on Windows 11. It should also work on Windows 10 and Windows on ARM, but I have not tested those. If something breaks, open an issue or message me on GitHub.
+Tested on Windows 11 and on macOS 27 with Apple silicon. It should also work on Windows 10, Windows on ARM and macOS 12 or later, but I have not tested those. There is no version for Intel Macs. If something breaks, open an issue or message me on GitHub.
 
-It shows on the main taskbar only.
+On Windows it shows on the main taskbar only.
+
+## Privacy
+
+- Nothing leaves your computer. No account, tracking, ads or server.
+- No network library in the program. It only reads your adapters' byte counts from the system.
+- Usage and settings stay in `%APPDATA%\NetSpeedGauge` on Windows and `~/Library/Application Support/NetSpeedGauge` on Mac. They are not encrypted, they are just never sent anywhere.
+- The code is all here, so you can check it yourself or ask an AI to.
+
+## CPU and RAM
 
 <table>
-  <tr>
-    <td valign="top" width="50%">
-      <h2>Privacy</h2>
-      <ul>
-        <li>Nothing leaves your PC. No account, tracking, ads or server.</li>
-        <li>No network library in the program. It only reads your adapters' byte counts from Windows.</li>
-        <li>Usage and settings stay in <code>%APPDATA%\NetSpeedGauge</code>. They are not encrypted, they are just never sent anywhere.</li>
-        <li>The code is all here, so you can check it yourself or ask an AI to.</li>
-      </ul>
-    </td>
-    <td valign="top" width="50%">
-      <h2>Size on my PC</h2>
-      <table>
-        <tr><td>RAM on the taskbar</td><td>1.7 to 2.9 MB</td></tr>
-        <tr><td>RAM with Usage open</td><td>4.3 MB</td></tr>
-        <tr><td>RAM with Settings open</td><td>6.1 MB</td></tr>
-        <tr><td>CPU</td><td>0.013% of the processor</td></tr>
-        <tr><td>Download</td><td>408 KB</td></tr>
-      </table>
-      <sub>Windows 11, 10 minutes of normal use. Yours may differ. Usage and Settings give their memory back when closed.</sub>
-    </td>
-  </tr>
+  <tr><th></th><th>Windows</th><th>Mac</th></tr>
+  <tr><td>Tested on</td><td>Ryzen 5800H, 16GB</td><td>M4, 16GB</td></tr>
+  <tr><td>CPU, average</td><td>0.17% of one core (0.01% of the processor)</td><td>0.37% of one core (0.04% of the processor)</td></tr>
+  <tr><td>CPU, highest 15 seconds</td><td>0.41% of one core</td><td>0.86% of one core</td></tr>
+  <tr><td>RAM, average</td><td>2.4 MB (working set)</td><td>14 MB (physical footprint)</td></tr>
+  <tr><td>RAM with a window open</td><td>4.2 MB with Usage, 7.2 MB with Settings</td><td>Up to 92 MB, about 32 MB after closing</td></tr>
+  <tr><td>RAM after closing the window</td><td>1.5 MB</td><td>About 32 MB</td></tr>
 </table>
+
+<sub>10 minutes each, plugged in, updating every second with Slow down when idle on, and light traffic (under 10 MB on each). The two RAM tools measure differently, so the RAM figures are not a direct comparison. Window figures are readings, not averages. Heavy traffic has not been measured. Yours may differ.</sub>
 
 ## Common questions
 
@@ -133,8 +143,13 @@ It shows on the main taskbar only.
 </details>
 
 <details>
-<summary><b>How do I check how much data I used this month on Windows?</b></summary>
-<br>Click the numbers, or right-click them and choose <b>Usage</b>, then pick <b>Month</b>.
+<summary><b>How do I see internet speed in the Mac menu bar?</b></summary>
+<br>Run NetSpeedGauge. Upload and download appear side by side in the menu bar.
+</details>
+
+<details>
+<summary><b>How do I check how much data I used this month on Windows or Mac?</b></summary>
+<br>Right-click the numbers, choose <b>Usage</b>, then pick <b>Month</b>.
 </details>
 
 <details>
@@ -154,7 +169,7 @@ It shows on the main taskbar only.
 
 ## Build it yourself
 
-You need Rust and the Visual Studio C++ build tools.
+On Windows you need Rust and the Visual Studio C++ build tools.
 
 ```
 cargo test --release -p netspeedgauge-shared -p netspeedgauge-windows
@@ -162,6 +177,12 @@ cargo build --release -p netspeedgauge-windows --bin NetSpeedGauge
 ```
 
 The program ends up in `target\release\NetSpeedGauge.exe`.
+
+On a Mac with Apple silicon you need Rust and the Xcode command line tools. This runs the tests and builds `target/mac/NetSpeedGauge.app`:
+
+```
+./mac/bundle.sh
+```
 
 ## Licence
 

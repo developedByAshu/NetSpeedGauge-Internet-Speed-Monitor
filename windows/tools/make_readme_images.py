@@ -25,7 +25,7 @@ MUTED_COLOR = (170, 184, 208)
 ACCENT_COLOR = (96, 165, 250)
 SCALE = 4
 LEFT_MARGIN = 64
-STATS = [("Under 4 MB", "RAM"), ("0.013%", "CPU"), ("0", "connections")]
+STATS = [("Under 4 MB", "RAM"), ("0.01%", "CPU"), ("0", "connections")]
 
 
 def rounded(image, radius):
@@ -94,8 +94,8 @@ def draw_banner():
     banner.paste(icon, (LEFT_MARGIN, 72), icon)
     draw.text((LEFT_MARGIN + 88, 70), "NetSpeedGauge", font=ImageFont.truetype(FONT_STRONG, 56), fill=TEXT_COLOR)
     tagline = ImageFont.truetype(FONT_REGULAR, 28)
-    draw.text((LEFT_MARGIN, 172), "Internet speed monitor for the", font=tagline, fill=TEXT_COLOR)
-    draw.text((LEFT_MARGIN, 210), "Windows taskbar", font=tagline, fill=TEXT_COLOR)
+    draw.text((LEFT_MARGIN, 172), "#1 lightweight speed monitor", font=tagline, fill=TEXT_COLOR)
+    draw.text((LEFT_MARGIN, 210), "for Windows and Mac", font=tagline, fill=TEXT_COLOR)
 
     value_font = ImageFont.truetype(FONT_STRONG, 30)
     label_font = ImageFont.truetype(FONT_REGULAR, 19)
