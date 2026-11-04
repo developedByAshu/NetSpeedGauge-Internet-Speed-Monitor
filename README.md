@@ -110,7 +110,7 @@ To remove it, turn off **Start at login**, choose **Quit**, then delete the app 
 
 ## Works on
 
-Tested on Windows 11 and on macOS 27 with Apple silicon. It should also work on Windows 10, Windows on ARM and macOS 12 or later, but I have not tested those. There is no version for Intel Macs. If something breaks, open an issue or message me on GitHub.
+Tested on Windows 11 and on macOS 27 with Apple silicon. It should also work on Windows 10, Windows on ARM and macOS 12 or later, but I have not tested those. There is no version for Intel Macs. If something breaks, [open an issue](https://github.com/developedByAshu/NetSpeedGauge-Internet-Speed-Monitor/issues).
 
 On Windows it shows on the main taskbar only.
 
